@@ -1,0 +1,33 @@
+{
+  "base": "vs",
+  "inherit": true,
+  "rules": [
+    { "token": "comment", "foreground": "64748b", "fontStyle": "italic" },
+    { "token": "keyword", "foreground": "7c3aed" },
+    { "token": "string", "foreground": "0f766e" },
+    { "token": "constant.numeric", "foreground": "b45309" },
+    { "token": "entity.name.function", "foreground": "2563eb" },
+    { "token": "support.function", "foreground": "0f766e" },
+    { "token": "entity.name.type", "foreground": "334155" },
+    { "token": "support.class", "foreground": "0f766e" },
+    { "token": "variable", "foreground": "0f172a" },
+    { "token": "keyword.operator", "foreground": "1d4ed8" },
+    { "token": "meta.decorator", "foreground": "be123c" },
+    { "token": "punctuation", "foreground": "334155" }
+  ],
+  "colors": {
+    "editor.background": "#eef3ff",
+    "editor.foreground": "#0f172a",
+    "editorLineNumber.foreground": "#94a3b8",
+    "editorCursor.foreground": "#1d4ed8",
+    "editor.selectionBackground": "#dbeafe",
+    "editor.lineHighlightBackground": "#e2e8f0",
+    "editorIndentGuide.background": "#cbd5e1",
+    "editorGutter.background": "#eef3ff",
+    "editorSuggestWidget.background": "#ffffff",
+    "editorSuggestWidget.border": "#cbd5e1",
+    "editorSuggestWidget.selectedBackground": "#e2e8f0",
+    "editorHoverWidget.background": "#ffffff",
+    "editorHoverWidget.border": "#cbd5e1"
+  }
+}

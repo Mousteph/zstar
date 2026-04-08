@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Adernaline</title>
+    <script>
+      (function () {
+        try {
+          var persistedTheme = localStorage.getItem("zstar.theme");
+          var themeClass = persistedTheme === "light" ? "light" : "dark";
+          document.documentElement.classList.remove("dark", "light");
+          document.documentElement.classList.add(themeClass);
+        } catch (error) {
+          document.documentElement.classList.remove("dark", "light");
+          document.documentElement.classList.add("dark");
+          console.warn("Failed to read persisted theme from localStorage.", error);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
