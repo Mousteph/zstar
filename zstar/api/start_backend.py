@@ -6,7 +6,7 @@ from zstar.api.settings import get_settings
 
 settings = get_settings("config.yaml")
 
-app = FastAPI(title="ZStar Backtesting API", version="0.1.0")
+app = FastAPI(title="ZStar Backtesting API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
