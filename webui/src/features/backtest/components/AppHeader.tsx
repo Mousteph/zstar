@@ -31,7 +31,7 @@ export function AppHeader({
     <header className="h-12 border-b border-border/80 bg-background/85 px-4 backdrop-blur-md sm:px-6">
       <div className="mx-auto flex h-full w-full max-w-[1680px] items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-[1.08rem] font-semibold leading-none tracking-tight text-foreground">ZStar</h1>
+          <h1 className="text-[1.08rem] font-semibold leading-none tracking-tight text-foreground">Z*</h1>
           <span className="text-sm font-medium uppercase tracking-[0.14em] text-muted-foreground">backtest</span>
         </div>
 
