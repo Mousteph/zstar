@@ -1,3 +1,5 @@
+https://github.com/user-attachments/assets/91c7c6b0-fa99-4624-80f1-5554134992d2
+
 # Z* (ZStar)
 
 Lightweight backtesting framework for running Python trading strategies from a CLI, a FastAPI backend, or a React web UI.
