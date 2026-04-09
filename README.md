@@ -56,7 +56,7 @@ docker compose --profile dev up --build
 ```bash
 python -m zstar.cli backtest \
   --strategy-file examples/cli/strategy.py \
-  --config-file examples/cli/config.yaml
+  --config-file examples/cli/cli_config.yaml
 ```
 
 Default CLI outputs:
