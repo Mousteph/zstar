@@ -1,12 +1,12 @@
 import pandas as pd
 import pytest
 
-from zstar.core.core_strategy import CoreStrategy, load_strategy_from_code
+from zstar.core.strategy.core_strategy import CoreStrategy, load_strategy_from_code
 from zstar.core.exceptions import StrategyExecutionError
 
 
 VALID_STRATEGY_CODE = """
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy import CoreStrategy
 
 class MyStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):

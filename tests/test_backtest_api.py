@@ -12,7 +12,7 @@ backtest_router_module = importlib.import_module("zstar.api.backtest.backtest_ro
 client = TestClient(app)
 
 VALID_STRATEGY_CODE = """
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy import CoreStrategy
 
 class SimpleStrategy(CoreStrategy):
     def long_entry_signals(self, data):
@@ -132,7 +132,7 @@ def test_run_backtest_rejects_missing_strategy_instance(monkeypatch):
         "/api/backtest/run",
         json=_payload(
             strategy_code="""
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy import CoreStrategy
 class BadStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):
         return 1.0

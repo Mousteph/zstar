@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from zstar.core.trade_order import Trade
 from zstar.core.backtest import BacktestReport, BacktesterEngine
 from zstar.core.data_loader import YahooData
-from zstar.core.core_strategy import load_strategy_from_code
+from zstar.core.strategy.core_strategy import load_strategy_from_code
 from zstar.core.exceptions import BacktestServiceError
 
 from .models import (

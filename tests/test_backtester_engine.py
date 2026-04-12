@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy import CoreStrategy
 from zstar.core.data_loader.data_handler import DataHandler
 from zstar.core.backtest.backtester_engine import BacktesterEngine
 from zstar.core.backtest.backtest_config_model import BacktestConfigModel

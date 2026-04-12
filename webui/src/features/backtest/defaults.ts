@@ -2,7 +2,7 @@ import type { BacktestSettings } from "@/types/backtest";
 
 export const defaultStrategyCode = `import numpy as np
 import pandas as pd
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy import CoreStrategy
 
 class MovingAverageCrossStrategy(CoreStrategy):
     def __init__(self, short_window=20, long_window=50, risk_pct=2.0):

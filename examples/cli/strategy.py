@@ -1,4 +1,4 @@
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy.core_strategy import CoreStrategy
 
 
 class MovingAverageCrossStrategy(CoreStrategy):

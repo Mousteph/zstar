@@ -14,7 +14,7 @@ cli_app_module = importlib.import_module("zstar.cli.app")
 
 
 VALID_STRATEGY = """
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy import CoreStrategy
 
 class SimpleStrategy(CoreStrategy):
     def long_entry_signals(self, data):
@@ -35,7 +35,7 @@ strategy = SimpleStrategy()
 
 
 INVALID_STRATEGY = """
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy import CoreStrategy
 
 class BadStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):
