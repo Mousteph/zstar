@@ -13,11 +13,16 @@ class ValidateStrategy:
         dates = pd.date_range(start="2020-01-01", periods=rows, freq="D")
         rng = np.random.default_rng(seed=42)
 
+        open_prices = rng.random(rows) * 100
+        close_prices = rng.random(rows) * 100
+        high_noise = rng.random(rows) * 10
+        low_noise = rng.random(rows) * 10
+
         data = {
-            "open": rng.random(rows) * 100,
-            "high": rng.random(rows) * 100,
-            "low": rng.random(rows) * 100,
-            "close": rng.random(rows) * 100,
+            "open": open_prices,
+            "high": np.maximum(open_prices, close_prices) + high_noise,
+            "low": np.minimum(open_prices, close_prices) - low_noise,
+            "close": close_prices,
             "volume": rng.integers(1, 1000, size=rows),
         }
 
@@ -64,7 +69,7 @@ class ValidateStrategy:
         try:
             tree = ast.parse(code)
         except SyntaxError as e:
-            return[f"SyntaxError: line {e.lineno}, col {e.offset}: {e.msg}"]
+            return [f"SyntaxError: line {e.lineno}, col {e.offset}: {e.msg}"]
 
         strategy_classes = self.get_corestrategy_subclass_names(tree)
         if not strategy_classes:
@@ -123,9 +128,12 @@ class ValidateStrategy:
             return [f"RuntimeError: {str(e)}"]
 
         errors = []
-        for col in self.required_signal_columns:
-            if col not in df.columns:
-                errors.append(f"RuntimeError: Missing required signal column '{col}'")
+        try:
+            for col in self.required_signal_columns:
+                if col not in df.columns:
+                    errors.append(f"RuntimeError: Missing required signal column '{col}'")
+        except Exception as e:
+            errors.append(f"RuntimeError when validating signal columns: {str(e)}")
 
         try:
             size = strategy.position_size(10000, 100)
