@@ -15,6 +15,11 @@ export interface BacktestSettings {
   slippageSeed: string;
 }
 
+export interface BacktestRunStatus {
+  tone: "success" | "error";
+  message: string;
+}
+
 export interface BacktestRunRequest {
   strategy_code: string;
   data: {

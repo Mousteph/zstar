@@ -11,6 +11,7 @@ import { defaultBacktestSettings, defaultStrategyCode } from "@/features/backtes
 import { formatKpiLabel, formatKpiValue } from "@/features/backtest/utils";
 import type {
   BacktestRunResponse,
+  BacktestRunStatus,
   EquityPoint,
   KpiMetric,
   KpiMetricTone,
@@ -157,7 +158,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(defaultBacktestSettings);
   const [backtestResult, setBacktestResult] = useState<BacktestRunResponse | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [runStatus, setRunStatus] = useState<BacktestRunStatus | null>(null);
   const [isCodeVisible, setIsCodeVisible] = useState(true);
   const [dashboardPanelSize, setDashboardPanelSize] = useState(DEFAULT_DASHBOARD_PANEL_SIZE);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialThemeMode);
@@ -199,7 +200,7 @@ export default function App() {
 
   const handleRunBacktest = useCallback(async () => {
     setIsRunning(true);
-    setErrorMessage(null);
+    setRunStatus(null);
 
     const slippageSeed = settings.slippageSeed.trim();
     const parsedSlippageSeed = slippageSeed ? Number(slippageSeed) : undefined;
@@ -228,8 +229,15 @@ export default function App() {
       });
 
       setBacktestResult(result);
+      setRunStatus({
+        tone: "success",
+        message: "Backtest completed successfully.",
+      });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Backtest failed.");
+      setRunStatus({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Backtest failed.",
+      });
     } finally {
       setIsRunning(false);
     }
@@ -273,6 +281,7 @@ export default function App() {
                   kpiMetrics={kpiMetrics}
                   kpiRows={kpiRows}
                   recentTrades={recentTrades}
+                  runStatus={runStatus}
                   settings={settings}
                 />
               </ResizablePanel>
@@ -296,6 +305,7 @@ export default function App() {
               kpiMetrics={kpiMetrics}
               kpiRows={kpiRows}
               recentTrades={recentTrades}
+              runStatus={runStatus}
               settings={settings}
             />
           </section>
@@ -316,6 +326,7 @@ export default function App() {
               kpiMetrics={kpiMetrics}
               kpiRows={kpiRows}
               recentTrades={recentTrades}
+              runStatus={runStatus}
               settings={settings}
             />
           </section>
@@ -331,6 +342,7 @@ export default function App() {
           kpiMetrics={kpiMetrics}
           kpiRows={kpiRows}
           recentTrades={recentTrades}
+          runStatus={runStatus}
           settings={settings}
         />
       </section>
@@ -348,12 +360,6 @@ export default function App() {
         onToggleCodeVisibility={handleToggleCodeVisibility}
         onToggleTheme={handleToggleTheme}
       />
-
-      {errorMessage ? (
-        <div className="border-b border-red-700/40 bg-red-950/30 px-4 py-2 text-sm text-red-200">
-          {errorMessage}
-        </div>
-      ) : null}
 
       <main className="flex-1 overflow-hidden">{mainContent}</main>
 
