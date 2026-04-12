@@ -10,7 +10,7 @@ ZStar gives you a small local workflow for testing a strategy against historical
 
 ## How It Works
 
-1. You define a Python `strategy` object that inherits from `CoreStrategy`.
+1. You define a Python strategy class that inherits from `CoreStrategy`.
 2. ZStar loads OHLCV data from Yahoo Finance.
 3. The backtest engine applies your signals, position sizing, fees, and slippage.
 4. Results are returned in the UI/API or written by the CLI as KPI JSON and an equity-curve HTML report.
@@ -87,9 +87,9 @@ The Vite dev server proxies `/api` requests to `http://localhost:8000` by defaul
 ## Use From Python
 
 ```python
+from zstar import CoreStrategy
 from zstar.core.backtest import BacktesterEngine, BacktestConfigModel
 from zstar.core.data_loader import DataLoaderConfigModel, YahooData
-from zstar.core.core_strategy import CoreStrategy
 
 
 class BuyAndHoldStrategy(CoreStrategy):
@@ -107,8 +107,6 @@ class BuyAndHoldStrategy(CoreStrategy):
         return round(balance / entry_price, 4)
 
 
-strategy = BuyAndHoldStrategy()
-
 data_config = DataLoaderConfigModel(
     symbol="AAPL",
     start_date="2024-01-01",
@@ -124,14 +122,14 @@ backtest_config = BacktestConfigModel(
     slippage_seed=42,
 )
 
-engine = BacktesterEngine(strategy, YahooData(data_config), backtest_config)
+engine = BacktesterEngine(BuyAndHoldStrategy(), YahooData(data_config), backtest_config)
 report = engine.run_backtest()
 
 print(report.kpis())
 print(report.equity_curve().tail())
 ```
 
-Your strategy must inherit from `CoreStrategy` and expose the entry, exit, and sizing logic you want to test.
+For dynamic strategy files used by the UI or CLI, define exactly one `CoreStrategy` subclass and ZStar will inject `CoreStrategy`, `pd`, and `np` automatically.
 
 ## Validation
 

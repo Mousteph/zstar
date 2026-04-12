@@ -14,8 +14,6 @@ cli_app_module = importlib.import_module("zstar.cli.app")
 
 
 VALID_STRATEGY = """
-from zstar.core.strategy import CoreStrategy
-
 class SimpleStrategy(CoreStrategy):
     def long_entry_signals(self, data):
         data[\"long_entry\"] = 0
@@ -29,15 +27,15 @@ class SimpleStrategy(CoreStrategy):
 
     def position_size(self, balance, entry_price):
         return 1.0
-
-strategy = SimpleStrategy()
 """
 
 
 INVALID_STRATEGY = """
-from zstar.core.strategy import CoreStrategy
+class AlphaStrategy(CoreStrategy):
+    def position_size(self, balance, entry_price):
+        return 1.0
 
-class BadStrategy(CoreStrategy):
+class BetaStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):
         return 1.0
 """
@@ -159,7 +157,7 @@ def test_cli_backtest_fails_when_strategy_instance_missing(tmp_path, monkeypatch
     )
 
     assert result.exit_code == 1
-    assert "error occurred during backtest execution" in result.stdout.lower()
+    assert "multiple corestrategy subclasses found" in result.stdout.lower()
 
 
 def test_cli_backtest_fails_when_config_is_invalid(tmp_path):
