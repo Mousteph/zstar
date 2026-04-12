@@ -12,8 +12,6 @@ backtest_router_module = importlib.import_module("zstar.api.backtest.backtest_ro
 client = TestClient(app)
 
 VALID_STRATEGY_CODE = """
-from zstar.core.core_strategy import CoreStrategy
-
 class SimpleStrategy(CoreStrategy):
     def long_entry_signals(self, data):
         data["long_entry"] = 0
@@ -27,8 +25,6 @@ class SimpleStrategy(CoreStrategy):
 
     def position_size(self, balance, entry_price):
         return 1.0
-
-strategy = SimpleStrategy()
 """
 
 
@@ -132,8 +128,11 @@ def test_run_backtest_rejects_missing_strategy_instance(monkeypatch):
         "/api/backtest/run",
         json=_payload(
             strategy_code="""
-from zstar.core.core_strategy import CoreStrategy
-class BadStrategy(CoreStrategy):
+class AlphaStrategy(CoreStrategy):
+    def position_size(self, balance, entry_price):
+        return 1.0
+
+class BetaStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):
         return 1.0
 """,
@@ -141,7 +140,8 @@ class BadStrategy(CoreStrategy):
     )
 
     assert response.status_code == 400
-    assert "backtest_execution_error" in response.json()["detail"].lower()
+    assert "strategy_validation_error" in response.json()["detail"].lower()
+    assert "multiple corestrategy subclasses found" in response.json()["detail"].lower()
 
 
 def test_run_backtest_rejects_empty_market_data(monkeypatch):

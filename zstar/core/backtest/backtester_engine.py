@@ -3,7 +3,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from zstar.core.core_strategy import CoreStrategy
+from zstar.core.strategy.core_strategy import CoreStrategy
 from zstar.core.trade_order import Order, Trade
 from zstar.core.data_loader import DataHandler
 from zstar.core.enums import TradeSide

@@ -2,7 +2,7 @@ import typer
 
 from zstar.core.backtest import BacktesterEngine
 from zstar.core.data_loader import YahooData
-from zstar.core.core_strategy import load_strategy_from_code
+from zstar.core.strategy import load_strategy_from_code
 from zstar.utils import read_yaml_file
 from .options import ConfigFileOption, StrategyFileOption
 from .runner import CliRunner

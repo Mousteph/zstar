@@ -1,5 +1,4 @@
-from zstar.core.core_strategy import CoreStrategy
-
+from zstar.core.strategy.core_strategy import CoreStrategy
 
 class MovingAverageCrossStrategy(CoreStrategy):
     def __init__(self, short_window: int = 20, long_window: int = 50, risk_pct: float = 2.0):
@@ -32,6 +31,3 @@ class MovingAverageCrossStrategy(CoreStrategy):
         if entry_price <= 0:
             return 0
         return max(1, round(max_risk / entry_price, 4))
-
-
-strategy = MovingAverageCrossStrategy()

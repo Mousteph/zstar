@@ -1,25 +1,15 @@
 from abc import ABC, abstractmethod
 import pandas as pd
-import numpy as np
-from zstar.core.exceptions import (
-    zstar_error,
-    StrategyExecutionError,
-    StrategyValidationError
-)
+from zstar.core.exceptions import StrategyValidationError
 
-def load_strategy_from_code(strategy_code: str) -> CoreStrategy:
-    scope = {
-        "__builtins__": __builtins__,
-        "CoreStrategy": CoreStrategy,
-        "pd": pd,
-        "np": np,
-    }
 
-    with zstar_error(StrategyExecutionError, "An error occurred while loading the strategy from code"):
-        exec(strategy_code, scope, scope)
-    
-    with zstar_error(StrategyValidationError, "The provided strategy code does not define a valid strategy class"):
-        strategy = scope.get("strategy")
+def load_strategy_from_code(strategy_code: str) -> "CoreStrategy":
+    from zstar.core.strategy.validate_strategy import ValidateStrategy
+    validate_strategy = ValidateStrategy()
+    strategy, errors = validate_strategy.validate(strategy_code)
+
+    if errors:
+        raise StrategyValidationError(errors)
 
     return strategy
 
