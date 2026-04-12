@@ -46,6 +46,43 @@ def test_load_strategy_from_code_wraps_execution_errors():
         load_strategy_from_code("this is invalid python code")
 
 
+def test_load_strategy_from_code_single_error_message_is_plain_string():
+    with pytest.raises(StrategyValidationError) as exc_info:
+        load_strategy_from_code(MULTI_STRATEGY_CODE)
+    message = str(exc_info.value)
+    assert isinstance(message, str)
+    assert not message.startswith("["), "Error message should not be a Python list repr"
+
+
+MULTI_ERROR_STRATEGY_CODE = """
+class BadSignalStrategy(CoreStrategy):
+    def long_entry_signals(self, data):
+        return data
+
+    def short_entry_signals(self, data):
+        return data
+
+    def long_exit_signals(self, data):
+        return data
+
+    def short_exit_signals(self, data):
+        return data
+
+    def position_size(self, balance, entry_price):
+        return -1.0
+"""
+
+
+def test_load_strategy_from_code_multi_error_message_joins_with_newline():
+    with pytest.raises(StrategyValidationError) as exc_info:
+        load_strategy_from_code(MULTI_ERROR_STRATEGY_CODE)
+    message = str(exc_info.value)
+    assert isinstance(message, str)
+    assert not message.startswith("["), "Error message should not be a Python list repr"
+    # Multiple errors should be joined with newlines
+    assert "\n" in message, "Multiple errors should be joined with newlines"
+
+
 def test_load_strategy_from_code_rejects_multiple_strategy_classes():
     with pytest.raises(StrategyValidationError):
         load_strategy_from_code(MULTI_STRATEGY_CODE)
