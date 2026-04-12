@@ -7,6 +7,7 @@ import { MarketOhlcvChart } from "@/features/backtest/components/MarketOhlcvChar
 import { RecentTradesTable } from "@/features/backtest/components/RecentTradesTable";
 import type {
   BacktestSettings,
+  BacktestRunStatus,
   EquityPoint,
   KpiMetric,
   KpiRow,
@@ -20,6 +21,7 @@ interface DashboardPanelProps {
   readonly kpiMetrics: KpiMetric[];
   readonly kpiRows: KpiRow[];
   readonly recentTrades: Trade[];
+  readonly runStatus: BacktestRunStatus | null;
   readonly settings: BacktestSettings;
 }
 
@@ -43,6 +45,7 @@ export const DashboardPanel = memo(function DashboardPanel({
   kpiMetrics,
   kpiRows,
   recentTrades,
+  runStatus,
   settings,
 }: DashboardPanelProps) {
   const symbol = settings.symbol.trim().toUpperCase() || "—";
@@ -67,6 +70,32 @@ export const DashboardPanel = memo(function DashboardPanel({
             <h2 className="hero-title-animation mt-3 font-display text-[clamp(3.75rem,12vw,10rem)] font-semibold leading-[0.9] tracking-[-0.04em] text-foreground">
               Backtest
             </h2>
+            {runStatus ? (
+              <div
+                className={[
+                  "status-line-animation mt-5 inline-flex max-w-[min(100%,30rem)] items-start gap-3 self-start rounded-2xl border px-4 py-3 backdrop-blur-sm",
+                  runStatus.tone === "error"
+                    ? "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]"
+                    : "border-emerald-400/30 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]",
+                ].join(" ")}
+                role={runStatus.tone === "error" ? "alert" : "status"}
+                aria-live={runStatus.tone === "error" ? "assertive" : "polite"}
+              >
+                <span
+                  className={[
+                    "mt-1 h-2 w-2 shrink-0 rounded-full",
+                    runStatus.tone === "error" ? "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.75)]" : "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.75)]",
+                  ].join(" ")}
+                  aria-hidden="true"
+                />
+                <div className="space-y-1">
+                  <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
+                    {runStatus.tone === "error" ? "Backtest Error" : "Backtest Status"}
+                  </p>
+                  <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">{runStatus.message}</p>
+                </div>
+              </div>
+            ) : null}
             <p className="hero-line-animation-delay-1 mt-5 text-base font-medium tracking-wide text-foreground/85 sm:text-lg">
               {symbol} - {interval}
             </p>

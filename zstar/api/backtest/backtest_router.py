@@ -133,7 +133,7 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
         data = data_handler.get_data()
 
     except BacktestServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=f"{exc.error_code}: {str(exc)}") from exc
+        raise HTTPException(status_code=exc.status_code, detail=f"{exc.error_code}:\n- {str(exc)}") from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"INTERNAL_SERVER_ERROR: {str(exc)}") from exc
 
