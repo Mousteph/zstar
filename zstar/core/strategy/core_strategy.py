@@ -9,7 +9,7 @@ def load_strategy_from_code(strategy_code: str) -> "CoreStrategy":
     strategy, errors = validate_strategy.validate(strategy_code)
 
     if errors:
-        message = "\n".join(errors)
+        message = "\n- ".join(errors)
         raise StrategyValidationError(message)
 
     return strategy
