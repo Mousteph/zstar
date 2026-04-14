@@ -23,7 +23,7 @@ services:
     ports:
       - "3000:3000"
     command: >
-      sh -c "[ -d /app/webui/node_modules ] || npm ci; npm run dev -- --host 0.0.0.0 --port 3000"
+      sh -c "if [ ! -d /app/webui/node_modules ] || [ ! -f /app/webui/node_modules/.zstar_lock ] || ! cmp -s /app/webui/package-lock.json /app/webui/node_modules/.zstar_lock; then npm ci && cp /app/webui/package-lock.json /app/webui/node_modules/.zstar_lock; fi; npm run dev -- --host 0.0.0.0 --port 3000"
     volumes:
       - .:/app
       - /app/webui/node_modules

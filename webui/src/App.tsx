@@ -3,6 +3,7 @@ import type { Layout } from "react-resizable-panels";
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { runBacktest } from "@/features/backtest/api";
+import { AIAssistantHud } from "@/features/backtest/components/AIAssistantHud";
 import { AppHeader } from "@/features/backtest/components/AppHeader";
 import { BacktestSettingsPanel } from "@/features/backtest/components/BacktestSettingsPanel";
 import { DashboardPanel } from "@/features/backtest/components/DashboardPanel";
@@ -362,6 +363,8 @@ export default function App() {
       />
 
       <main className="flex-1 overflow-hidden">{mainContent}</main>
+
+      <AIAssistantHud />
 
       <BacktestSettingsPanel
         isOpen={isSettingsOpen}
