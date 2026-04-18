@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Layout } from "react-resizable-panels";
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -164,7 +164,7 @@ export default function App() {
   const [dashboardPanelSize, setDashboardPanelSize] = useState(DEFAULT_DASHBOARD_PANEL_SIZE);
   const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialThemeMode);
   const [isDesktopLayout, setIsDesktopLayout] = useState(getInitialDesktopLayout);
-  const strategyCodeRef = useRef(defaultStrategyCode);
+  const [strategyCode, setStrategyCode] = useState(defaultStrategyCode);
 
   useEffect(() => {
     if (globalThis.window === undefined) {
@@ -196,7 +196,11 @@ export default function App() {
   }, [themeMode]);
 
   const handleCodeChange = useCallback((nextCode: string) => {
-    strategyCodeRef.current = nextCode;
+    setStrategyCode(nextCode);
+  }, []);
+
+  const handleApplyStrategyCode = useCallback((nextCode: string) => {
+    setStrategyCode(nextCode);
   }, []);
 
   const handleRunBacktest = useCallback(async () => {
@@ -212,7 +216,7 @@ export default function App() {
 
     try {
       const result = await runBacktest({
-        strategy_code: strategyCodeRef.current,
+        strategy_code: strategyCode,
         data: {
           symbol: settings.symbol,
           start_date: settings.startDate,
@@ -242,7 +246,7 @@ export default function App() {
     } finally {
       setIsRunning(false);
     }
-  }, [settings]);
+  }, [settings, strategyCode]);
 
   const handleToggleCodeVisibility = useCallback(() => {
     setIsCodeVisible((currentVisibility) => !currentVisibility);
@@ -290,7 +294,7 @@ export default function App() {
               <ResizableHandle />
 
               <ResizablePanel defaultSize={100 - dashboardPanelSize} minSize={22} className="border-l border-border/80">
-                <EditorPanel code={strategyCodeRef.current} onCodeChange={handleCodeChange} themeMode={themeMode} />
+                <EditorPanel code={strategyCode} onCodeChange={handleCodeChange} themeMode={themeMode} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </div>
@@ -318,7 +322,7 @@ export default function App() {
       return (
         <div className="grid h-full grid-rows-[320px_minmax(0,1fr)]">
           <section className="min-h-0 border-b border-border/80">
-            <EditorPanel code={strategyCodeRef.current} onCodeChange={handleCodeChange} themeMode={themeMode} />
+            <EditorPanel code={strategyCode} onCodeChange={handleCodeChange} themeMode={themeMode} />
           </section>
           <section className="min-h-0 overflow-hidden flex flex-col">
             <DashboardPanel
@@ -364,7 +368,7 @@ export default function App() {
 
       <main className="flex-1 overflow-hidden">{mainContent}</main>
 
-      <AIAssistantHud />
+      <AIAssistantHud onApplyStrategyCode={handleApplyStrategyCode} />
 
       <BacktestSettingsPanel
         isOpen={isSettingsOpen}

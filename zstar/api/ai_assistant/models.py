@@ -27,8 +27,3 @@ class AssistantGenerateRequest(BaseModel):
         normalized = value.strip()
         return normalized or None
 
-
-class AssistantGenerateResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    markdown: str = Field(min_length=1, max_length=8000, description="Assistant markdown response")

@@ -1,12 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  ArrowUp,
+  Check,
+  ClipboardCheck,
+  Copy,
+  FileCode2,
+  LoaderCircle,
+  Trash2,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
 
-import { sendAssistantGenerate } from "@/features/aiAssistant/api";
+import { sendAssistantGenerateStream } from "@/features/aiAssistant/api";
+import type { AssistantStatusEvent } from "@/types/aiAssistant";
 
 const HOVER_MEDIA_QUERY = "(hover: hover) and (pointer: fine)";
 const MAX_HUD_HEIGHT_RATIO = 0.7;
@@ -17,6 +27,18 @@ interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   markdown: string;
+  strategyCode?: string;
+  isStrategyGeneration?: boolean;
+}
+
+interface ProgressStep {
+  stepId: string;
+  label: string;
+  state: "running" | "done";
+}
+
+interface AIAssistantHudProps {
+  readonly onApplyStrategyCode?: (code: string) => void;
 }
 
 function getInitialCanHover(): boolean {
@@ -39,9 +61,21 @@ function hasCodeBlock(markdown: string): boolean {
   return markdown.includes("```");
 }
 
+function getCodeContent(children: ReactNode): string {
+  if (typeof children === "string" || typeof children === "number") {
+    return String(children).replace(/\n$/, "");
+  }
+
+  if (Array.isArray(children)) {
+    return children.map((child) => getCodeContent(child)).join("").replace(/\n$/, "");
+  }
+
+  return "";
+}
+
 const markdownComponents: Components = {
   code({ children, className, ...props }) {
-    const codeContent = String(children).replace(/\n$/, "");
+    const codeContent = getCodeContent(children);
     const languageMatch = /language-([\w-]+)/.exec(className ?? "");
     const isCodeBlock = Boolean(languageMatch) || codeContent.includes("\n");
 
@@ -95,7 +129,9 @@ function createIsEventInsideHud(
   };
 }
 
-export function AIAssistantHud() {
+export function AIAssistantHud({
+  onApplyStrategyCode,
+}: Readonly<AIAssistantHudProps>) {
   const expandedRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -107,6 +143,8 @@ export function AIAssistantHud() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const isExpanded = isPinned;
   const hasMessages = messages.length > 0;
@@ -190,7 +228,7 @@ export function AIAssistantHud() {
     }
 
     historyRef.current.scrollTop = historyRef.current.scrollHeight;
-  }, [isExpanded, messages, isSending]);
+  }, [isExpanded, messages, isSending, progressSteps]);
 
   useEffect(() => {
     if (!isExpanded) {
@@ -232,6 +270,41 @@ export function AIAssistantHud() {
     setIsPinned(true);
   };
 
+  const handleStatusEvent = (event: AssistantStatusEvent) => {
+    setProgressSteps((currentSteps) => {
+      const existingStepIndex = currentSteps.findIndex((step) => step.stepId === event.step_id);
+      const nextStep: ProgressStep = {
+        stepId: event.step_id,
+        label: event.label,
+        state: event.state,
+      };
+
+      if (existingStepIndex === -1) {
+        return [...currentSteps, nextStep];
+      }
+
+      return currentSteps.map((step, index) => (index === existingStepIndex ? nextStep : step));
+    });
+  };
+
+  const handleCopyStrategyCode = async (messageId: string, strategyCode: string) => {
+    if (!strategyCode.trim() || globalThis.navigator?.clipboard === undefined) {
+      return;
+    }
+
+    try {
+      await globalThis.navigator.clipboard.writeText(strategyCode);
+      setCopiedMessageId(messageId);
+      globalThis.window?.setTimeout(() => {
+        setCopiedMessageId((currentCopiedMessageId) =>
+          currentCopiedMessageId === messageId ? null : currentCopiedMessageId,
+        );
+      }, 1400);
+    } catch {
+      // Clipboard may be blocked by browser policy; keep UI silent in that case.
+    }
+  };
+
   const handleSendMessage = async () => {
     if (isSending) {
       return;
@@ -245,6 +318,8 @@ export function AIAssistantHud() {
 
     setIsSending(true);
     setComposerError(null);
+    setProgressSteps([]);
+    setCopiedMessageId(null);
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -261,16 +336,26 @@ export function AIAssistantHud() {
     }
 
     try {
-      const response = await sendAssistantGenerate({ message: normalizedMessage });
+      const streamResponse = await sendAssistantGenerateStream(
+        { message: normalizedMessage },
+        {
+          onStatus: handleStatusEvent,
+        },
+      );
+
+      setProgressSteps([]);
       setMessages((currentMessages) => [
         ...currentMessages,
         {
           id: `assistant-${Date.now()}`,
           role: "assistant",
-          markdown: response.markdown,
+          markdown: streamResponse.markdown,
+          strategyCode: streamResponse.strategy_code,
+          isStrategyGeneration: streamResponse.is_strategy_generation,
         },
       ]);
     } catch (error) {
+      setProgressSteps([]);
       setMessages((currentMessages) => [
         ...currentMessages,
         {
@@ -298,6 +383,8 @@ export function AIAssistantHud() {
 
     setMessages([]);
     setComposerError(null);
+    setProgressSteps([]);
+    setCopiedMessageId(null);
   };
 
   return (
@@ -366,6 +453,41 @@ export function AIAssistantHud() {
                           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                             {message.markdown}
                           </ReactMarkdown>
+                          {message.isStrategyGeneration && message.strategyCode ? (
+                            <div className="zstar-ai-hud__strategy-actions">
+                              <button
+                                type="button"
+                                className="zstar-ai-hud__strategy-action-button"
+                                onClick={() => {
+                                  void handleCopyStrategyCode(message.id, message.strategyCode ?? "");
+                                }}
+                                title="Copy strategy code"
+                                aria-label="Copy strategy code"
+                              >
+                                {copiedMessageId === message.id ? (
+                                  <ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="zstar-ai-hud__strategy-action-button"
+                                onClick={() => {
+                                  if (!message.strategyCode || !onApplyStrategyCode) {
+                                    return;
+                                  }
+                                  onApplyStrategyCode(message.strategyCode);
+                                }}
+                                disabled={!onApplyStrategyCode}
+                                title="Insert strategy code into editor"
+                                aria-label="Insert strategy code into editor"
+                              >
+                                <FileCode2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         <p className="zstar-ai-hud__user-bubble">{message.markdown}</p>
@@ -373,10 +495,22 @@ export function AIAssistantHud() {
                     </article>
                   ))}
 
-                  {isSending ? (
-                    <p className="zstar-ai-hud__typing" aria-live="polite">
-                      Assistant is thinking...
-                    </p>
+                  {isSending && progressSteps.length > 0 ? (
+                    <div className="zstar-ai-hud__progress" aria-live="polite">
+                      {progressSteps.map((step) => (
+                        <p key={step.stepId} className="zstar-ai-hud__progress-row">
+                          {step.state === "done" ? (
+                            <Check className="zstar-ai-hud__progress-done h-3.5 w-3.5" aria-hidden="true" />
+                          ) : (
+                            <LoaderCircle
+                              className="zstar-ai-hud__progress-running h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <span>{step.label}</span>
+                        </p>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
               </div>

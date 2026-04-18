@@ -1,7 +1,7 @@
 from zstar.llm.models import StrategyGeneration
 from zstar.core.strategy import ValidateStrategy
 from ollama import chat
-from typing import List, Optional
+from typing import Callable, List, Optional
 import json
 
 
@@ -93,25 +93,50 @@ class CodeGenerator:
         user_prompt: str,
         max_nb_errors: int = 2,
         model: Optional[str] = None,
+        progress_callback: Optional[Callable[[str, str, str], None]] = None,
     ) -> StrategyGeneration:
+        def emit_progress(step_id: str, label: str, state: str) -> None:
+            if progress_callback is None:
+                return
+
+            try:
+                progress_callback(step_id, label, state)
+            except Exception:
+                # Keep generation flow resilient if UI logging callback fails.
+                return
+
         original_model = self.model
         if model and model.strip():
             self.model = model.strip()
 
         try:
             print("Generating code...")
+            emit_progress("generate_code", "Generating code...", "running")
             strategy_generation = self.generate_code(user_prompt)
             print("Code generation complete.")
+            emit_progress("generate_code", "Generating code...", "done")
 
             print("Validating syntax...")
+            validation_attempt = 1
+            validation_step_id = f"validate_syntax_{validation_attempt}"
+            emit_progress(validation_step_id, "Validating syntax...", "running")
             list_error = self.validate_strategy.validate(strategy_generation.code)
+            emit_progress(validation_step_id, "Validating syntax...", "done")
             nb_error = 0
 
             while len(list_error) > 0 and nb_error < max_nb_errors:
                 nb_error += 1
                 print(f"Validation failed with {len(list_error)} error(s). Attempting retry {nb_error}...")
+                retry_step_id = f"retry_generation_{nb_error}"
+                retry_label = f"Validation failed ({len(list_error)}). Retrying ({nb_error}/{max_nb_errors})..."
+                emit_progress(retry_step_id, retry_label, "running")
                 strategy_generation = self.retry_generation(user_prompt, strategy_generation, list_error)
+                emit_progress(retry_step_id, retry_label, "done")
+                validation_attempt += 1
+                validation_step_id = f"validate_syntax_{validation_attempt}"
+                emit_progress(validation_step_id, "Validating syntax...", "running")
                 list_error = self.validate_strategy.validate(strategy_generation.code)
+                emit_progress(validation_step_id, "Validating syntax...", "done")
 
             if len(list_error) > 0:
                 print("Validation of the generated code failed, please fix the code manually.")
