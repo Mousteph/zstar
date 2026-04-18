@@ -1,9 +1,9 @@
-import type { AssistantEchoRequest, AssistantEchoResponse } from "@/types/aiAssistant";
+import type { AssistantGenerateRequest, AssistantGenerateResponse } from "@/types/aiAssistant";
 
-export async function sendAssistantEcho(
-  payload: AssistantEchoRequest,
-): Promise<AssistantEchoResponse> {
-  const response = await fetch("/api/ai-assistant/echo", {
+export async function sendAssistantGenerate(
+  payload: AssistantGenerateRequest,
+): Promise<AssistantGenerateResponse> {
+  const response = await fetch("/api/ai-assistant/generate", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -12,7 +12,7 @@ export async function sendAssistantEcho(
   });
 
   const responseJson = (await response.json()) as
-    | AssistantEchoResponse
+    | AssistantGenerateResponse
     | {
         detail?: string;
       };
@@ -25,5 +25,5 @@ export async function sendAssistantEcho(
     throw new Error(detail);
   }
 
-  return responseJson as AssistantEchoResponse;
+  return responseJson as AssistantGenerateResponse;
 }

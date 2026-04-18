@@ -1,7 +1,8 @@
-export interface AssistantEchoRequest {
+export interface AssistantGenerateRequest {
   message: string;
+  model?: string;
 }
 
-export interface AssistantEchoResponse {
+export interface AssistantGenerateResponse {
   markdown: string;
 }

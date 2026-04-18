@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import remarkGfm from "remark-gfm";
 
-import { sendAssistantEcho } from "@/features/aiAssistant/api";
+import { sendAssistantGenerate } from "@/features/aiAssistant/api";
 
 const HOVER_MEDIA_QUERY = "(hover: hover) and (pointer: fine)";
 const MAX_HUD_HEIGHT_RATIO = 0.7;
@@ -35,6 +38,48 @@ function getErrorMessage(error: unknown): string {
 function hasCodeBlock(markdown: string): boolean {
   return markdown.includes("```");
 }
+
+const markdownComponents: Components = {
+  code({ children, className, ...props }) {
+    const codeContent = String(children).replace(/\n$/, "");
+    const languageMatch = /language-([\w-]+)/.exec(className ?? "");
+    const isCodeBlock = Boolean(languageMatch) || codeContent.includes("\n");
+
+    if (isCodeBlock) {
+      return (
+        <div className="zstar-ai-hud__code-block">
+          <SyntaxHighlighter
+            language={languageMatch?.[1] ?? "text"}
+            style={oneDark}
+            wrapLongLines={false}
+            customStyle={{
+              margin: 0,
+              padding: "0.9rem 1rem",
+              borderRadius: "0.72rem",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              background: "rgba(6, 10, 20, 0.96)",
+              fontSize: "0.82rem",
+              lineHeight: 1.5,
+            }}
+            codeTagProps={{
+              style: {
+                fontFamily: "var(--font-mono)",
+              },
+            }}
+          >
+            {codeContent}
+          </SyntaxHighlighter>
+        </div>
+      );
+    }
+
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+};
 
 
 function createIsEventInsideHud(
@@ -216,7 +261,7 @@ export function AIAssistantHud() {
     }
 
     try {
-      const response = await sendAssistantEcho({ message: normalizedMessage });
+      const response = await sendAssistantGenerate({ message: normalizedMessage });
       setMessages((currentMessages) => [
         ...currentMessages,
         {
@@ -318,7 +363,7 @@ export function AIAssistantHud() {
                         <div
                           className={`zstar-ai-hud__assistant-content zstar-ai-hud__markdown ${hasCodeBlock(message.markdown) ? "zstar-ai-hud__assistant-content--code" : ""}`}
                         >
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                             {message.markdown}
                           </ReactMarkdown>
                         </div>
