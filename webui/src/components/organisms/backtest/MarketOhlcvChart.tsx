@@ -8,7 +8,6 @@ import {
   type CandlestickData,
   type HistogramData,
   type IChartApi,
-  type ISeriesApi,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
@@ -194,9 +193,9 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    globalThis.window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      globalThis.window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isExpanded]);
 

@@ -12,7 +12,7 @@ export function useThemeModeSync(themeMode: ThemeMode): void {
     root.classList.add(themeMode);
 
     try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+      globalThis.window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
     } catch {
       // Keep in-memory theme if storage is unavailable.
     }

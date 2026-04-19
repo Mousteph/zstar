@@ -69,10 +69,15 @@ export function getTradeSideBadgeClassName(side: TradeSide): string {
 }
 
 export function getTradePnlClassName(pnl: number): string {
-  return cn(
-    "text-right font-medium",
-    pnl > 0 ? "text-emerald-500" : pnl < 0 ? "text-rose-500" : "text-muted-foreground",
-  );
+  let pnlClassName = "text-muted-foreground";
+
+  if (pnl > 0) {
+    pnlClassName = "text-emerald-500";
+  } else if (pnl < 0) {
+    pnlClassName = "text-rose-500";
+  }
+
+  return cn("text-right font-medium", pnlClassName);
 }
 
 export function formatKpiLabel(key: string): string {

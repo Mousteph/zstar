@@ -7,12 +7,12 @@ const THEME_STORAGE_KEY = "zstar.theme";
 const DEFAULT_DASHBOARD_PANEL_SIZE = 62;
 
 function getInitialThemeMode(): ThemeMode {
-  if (typeof window === "undefined") {
+  if (globalThis.window === undefined) {
     return "dark";
   }
 
   try {
-    const persistedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const persistedTheme = globalThis.window.localStorage.getItem(THEME_STORAGE_KEY);
     return persistedTheme === "light" ? "light" : "dark";
   } catch {
     return "dark";
@@ -20,11 +20,11 @@ function getInitialThemeMode(): ThemeMode {
 }
 
 function getInitialDesktopLayout(): boolean {
-  if (typeof window === "undefined") {
+  if (globalThis.window === undefined) {
     return true;
   }
 
-  return window.matchMedia(DESKTOP_LAYOUT_QUERY).matches;
+  return globalThis.window.matchMedia(DESKTOP_LAYOUT_QUERY).matches;
 }
 
 interface UIState {

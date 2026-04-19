@@ -83,7 +83,7 @@ export const DashboardPanel = memo(function DashboardPanel({
                     ? "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]"
                     : "border-emerald-400/30 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]",
                 ].join(" ")}
-                role={runStatus.tone === "error" ? "alert" : "status"}
+                role={runStatus.tone === "error" ? "alert" : undefined}
                 aria-live={runStatus.tone === "error" ? "assertive" : "polite"}
               >
                 <span

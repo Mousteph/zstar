@@ -14,11 +14,11 @@ const MAX_TEXTAREA_HEIGHT_RATIO = 0.4;
 const MIN_TEXTAREA_HEIGHT = 96;
 
 function getInitialCanHover(): boolean {
-  if (typeof window === "undefined") {
+  if (globalThis.window === undefined) {
     return false;
   }
 
-  return window.matchMedia(HOVER_MEDIA_QUERY).matches;
+  return globalThis.window.matchMedia(HOVER_MEDIA_QUERY).matches;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -68,14 +68,14 @@ export function useAIAssistantHudController(options: Readonly<UseAIAssistantHudC
 
   const resizeTextarea = () => {
     const textareaElement = textareaRef.current;
-    if (!textareaElement || typeof window === "undefined") {
+    if (!textareaElement || globalThis.window === undefined) {
       return;
     }
 
-    const maxHudHeight = Math.floor(window.innerHeight * MAX_HUD_HEIGHT_RATIO);
+    const maxHudHeight = Math.floor(globalThis.window.innerHeight * MAX_HUD_HEIGHT_RATIO);
     const maxTextareaHeight = Math.max(
       MIN_TEXTAREA_HEIGHT,
-      Math.floor(window.innerHeight * MAX_TEXTAREA_HEIGHT_RATIO),
+      Math.floor(globalThis.window.innerHeight * MAX_TEXTAREA_HEIGHT_RATIO),
     );
     const boundedTextareaMaxHeight = Math.min(
       maxTextareaHeight,
@@ -92,11 +92,11 @@ export function useAIAssistantHudController(options: Readonly<UseAIAssistantHudC
   };
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (globalThis.window === undefined) {
       return;
     }
 
-    const mediaQueryList = window.matchMedia(HOVER_MEDIA_QUERY);
+    const mediaQueryList = globalThis.window.matchMedia(HOVER_MEDIA_QUERY);
     const handleMediaQueryChange = (event: MediaQueryListEvent) => {
       setCanHover(event.matches);
       if (!event.matches) {
@@ -113,18 +113,18 @@ export function useAIAssistantHudController(options: Readonly<UseAIAssistantHudC
   }, []);
 
   useEffect(() => {
-    if (!isPinned || typeof window === "undefined") {
+    if (!isPinned || globalThis.window === undefined) {
       return;
     }
 
-    window.requestAnimationFrame(() => {
+    globalThis.window.requestAnimationFrame(() => {
       resizeTextarea();
       textareaRef.current?.focus({ preventScroll: true });
     });
   }, [isPinned]);
 
   useEffect(() => {
-    if (!isPinned || typeof window === "undefined") {
+    if (!isPinned || globalThis.window === undefined) {
       return;
     }
 
@@ -132,9 +132,9 @@ export function useAIAssistantHudController(options: Readonly<UseAIAssistantHudC
       resizeTextarea();
     };
 
-    window.addEventListener("resize", handleWindowResize);
+    globalThis.window.addEventListener("resize", handleWindowResize);
     return () => {
-      window.removeEventListener("resize", handleWindowResize);
+      globalThis.window.removeEventListener("resize", handleWindowResize);
     };
   }, [isPinned]);
 
@@ -210,7 +210,7 @@ export function useAIAssistantHudController(options: Readonly<UseAIAssistantHudC
     try {
       await navigator.clipboard.writeText(strategyCode);
       setCopiedMessageId(messageId);
-      window.setTimeout(() => {
+      globalThis.window.setTimeout(() => {
         setCopiedMessageId((currentCopiedMessageId) =>
           currentCopiedMessageId === messageId ? null : currentCopiedMessageId,
         );
@@ -282,8 +282,8 @@ export function useAIAssistantHudController(options: Readonly<UseAIAssistantHudC
     } finally {
       setIsSending(false);
 
-      if (typeof window !== "undefined") {
-        window.requestAnimationFrame(() => {
+      if (globalThis.window !== undefined) {
+        globalThis.window.requestAnimationFrame(() => {
           resizeTextarea();
           textareaRef.current?.focus({ preventScroll: true });
         });

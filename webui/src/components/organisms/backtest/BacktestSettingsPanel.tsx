@@ -42,9 +42,9 @@ export function BacktestSettingsPanel({
       }
     };
 
-    window.addEventListener("keydown", handleEscape);
+    globalThis.window.addEventListener("keydown", handleEscape);
     return () => {
-      window.removeEventListener("keydown", handleEscape);
+      globalThis.window.removeEventListener("keydown", handleEscape);
     };
   }, [isOpen, onClose]);
 
