@@ -11,17 +11,17 @@ const TONE_STYLES: Record<KpiMetricTone, ToneStyles> = {
   positive: {
     iconClassName: "text-emerald-500",
     valueClassName: "text-emerald-500",
-    strokeColor: "#10b981",
+    strokeColor: "rgb(16 185 129)",
   },
   neutral: {
     iconClassName: "text-blue-500",
     valueClassName: "",
-    strokeColor: "#3b82f6",
+    strokeColor: "rgb(59 130 246)",
   },
   negative: {
     iconClassName: "text-rose-500",
     valueClassName: "text-rose-500",
-    strokeColor: "#f43f5e",
+    strokeColor: "rgb(244 63 94)",
   },
 };
 

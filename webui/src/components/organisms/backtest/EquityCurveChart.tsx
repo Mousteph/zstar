@@ -1,21 +1,14 @@
-import { useEffect, useState } from "react";
-import { useScrollLock } from "@/hooks/useScrollLock";
-import { createPortal } from "react-dom";
-import { Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react";
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+"use client";
 
-import { Button } from "@/components/ui/button";
-import { SECTION_TITLE_CLASS_NAME } from "@/features/backtest/constants";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+import { ActionIconButton } from "@/components/molecules/ActionIconButton";
+import { ExpandableSection } from "@/components/molecules/ExpandableSection";
 import { formatCurrency, formatDateTime } from "@/features/backtest/utils";
+import { useScrollLock } from "@/hooks/useScrollLock";
+import { readCssVariable } from "@/lib/dom/readCssVariable";
 import { cn } from "@/lib/utils";
 import type { EquityPoint } from "@/types/backtest";
 
@@ -33,7 +26,7 @@ function formatAxisValue(value: number): string {
   }).format(value);
 }
 
-export function EquityCurveChart({ data }: EquityCurveChartProps) {
+export function EquityCurveChart({ data }: Readonly<EquityCurveChartProps>) {
   const [isBuyAndHoldVisible, setIsBuyAndHoldVisible] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -50,37 +43,40 @@ export function EquityCurveChart({ data }: EquityCurveChartProps) {
       }
     };
 
-    globalThis.window.addEventListener("keydown", handleKeyDown);
-
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      globalThis.window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isExpanded]);
 
+  const chartColors = useMemo(
+    () => ({
+      strategyStroke: readCssVariable("--chart-positive", "rgb(16,185,129)"),
+      buyHoldStroke: readCssVariable("--chart-neutral", "rgb(59,130,246)"),
+      tooltipShadow: readCssVariable("--chart-tooltip-shadow", "0 4px 12px rgba(0,0,0,0.5)"),
+    }),
+    [isExpanded],
+  );
+
   const chartControls = (
     <div className="flex items-center gap-2">
-      <Button
+      <ActionIconButton
         type="button"
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 border border-border/80 bg-muted/60 text-foreground hover:bg-muted"
         onClick={() => setIsBuyAndHoldVisible((currentVisibility) => !currentVisibility)}
         aria-label={isBuyAndHoldVisible ? "Hide Buy & Hold" : "Show Buy & Hold"}
         title={isBuyAndHoldVisible ? "Hide Buy & Hold" : "Show Buy & Hold"}
       >
         {isBuyAndHoldVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-      </Button>
-      <Button
+      </ActionIconButton>
+
+      <ActionIconButton
         type="button"
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 border border-border/80 bg-muted/60 text-foreground hover:bg-muted"
         onClick={() => setIsExpanded((currentState) => !currentState)}
         aria-label={isExpanded ? "Minimize chart" : "Expand chart"}
         title={isExpanded ? "Minimize chart" : "Expand chart"}
       >
         {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-      </Button>
+      </ActionIconButton>
     </div>
   );
 
@@ -115,9 +111,9 @@ export function EquityCurveChart({ data }: EquityCurveChartProps) {
               borderColor: "hsl(var(--border))",
               borderRadius: "8px",
               color: "hsl(var(--foreground))",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+              boxShadow: chartColors.tooltipShadow,
             }}
-            itemStyle={{ color: "#10b981" }}
+            itemStyle={{ color: chartColors.strategyStroke }}
             formatter={(value, name) => [formatCurrency(Number(value)), name]}
             labelFormatter={(value) => formatDateTime(String(value))}
             labelStyle={{ color: "hsl(var(--muted-foreground))", marginBottom: "4px" }}
@@ -132,17 +128,17 @@ export function EquityCurveChart({ data }: EquityCurveChartProps) {
             type="monotone"
             name="Strategy"
             dataKey="strategy"
-            stroke="#10b981"
+            stroke={chartColors.strategyStroke}
             strokeWidth={3}
             dot={false}
-            style={{ filter: "drop-shadow(0 0 8px rgba(16, 185, 129, 0.45))" }}
+            className="equity-strategy-line"
           />
           {isBuyAndHoldVisible ? (
             <Line
               type="monotone"
               name="Buy & Hold"
               dataKey="buy_and_hold"
-              stroke="#3b82f6"
+              stroke={chartColors.buyHoldStroke}
               strokeWidth={2}
               dot={false}
             />
@@ -152,36 +148,16 @@ export function EquityCurveChart({ data }: EquityCurveChartProps) {
     </div>
   );
 
-  const chartSection = (
-    <section
-      className={cn(
-        isExpanded
-          ? "fixed inset-5 z-[40010] flex flex-col rounded-2xl border border-border/80 bg-background/95 p-6 shadow-2xl backdrop-blur-sm dark:bg-[#070b14]/95"
-          : "relative border-b border-border/80 px-2 pb-9 pt-2 sm:px-4 lg:px-6",
-      )}
+  return (
+    <ExpandableSection
+      isExpanded={isExpanded}
+      onCollapse={() => setIsExpanded(false)}
+      title="Equity Curve"
+      controls={chartControls}
+      inlineClassName="pb-9"
+      expandedClassName="chart-expanded-surface"
     >
-      <div className={cn("mb-5 flex items-center justify-between gap-3", isExpanded ? "shrink-0" : "")}>
-        <h3 className={SECTION_TITLE_CLASS_NAME}>Equity Curve</h3>
-        {chartControls}
-      </div>
       {chartBody}
-    </section>
+    </ExpandableSection>
   );
-
-  if (isExpanded && typeof document !== "undefined") {
-    return createPortal(
-      <>
-        <button
-          type="button"
-          className="fixed inset-0 z-[40000] bg-black/70 backdrop-blur-[1.5px]"
-          onClick={() => setIsExpanded(false)}
-          aria-label="Close expanded chart"
-        />
-        {chartSection}
-      </>,
-      document.body,
-    );
-  }
-
-  return chartSection;
 }

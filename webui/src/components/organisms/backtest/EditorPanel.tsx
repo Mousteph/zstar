@@ -1,10 +1,11 @@
+"use client";
+
 import { memo, useCallback, useMemo } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 
-import { EDITOR_PANEL_CLASS_NAME } from "@/features/backtest/constants";
+import { cn } from "@/lib/utils";
 import zstarLightTheme from "@/themes/Zstar-Light.json";
 import tokyoNightTheme from "@/themes/Tokyo-Night.json";
-import { cn } from "@/lib/utils";
 import type { ThemeMode } from "@/types/theme";
 
 interface EditorPanelProps {
@@ -13,7 +14,7 @@ interface EditorPanelProps {
   readonly themeMode: ThemeMode;
 }
 
-export const EditorPanel = memo(function EditorPanel({ code, onCodeChange, themeMode }: EditorPanelProps) {
+export const EditorPanel = memo(function EditorPanel({ code, onCodeChange, themeMode }: Readonly<EditorPanelProps>) {
   const handleEditorWillMount = useCallback((monaco: Monaco) => {
     monaco.editor.defineTheme(
       "zstar-night",
@@ -24,10 +25,9 @@ export const EditorPanel = memo(function EditorPanel({ code, onCodeChange, theme
       zstarLightTheme as Parameters<Monaco["editor"]["defineTheme"]>[1],
     );
   }, []);
-  const resolvedTheme = useMemo(
-    () => (themeMode === "dark" ? "zstar-night" : "zstar-day"),
-    [themeMode],
-  );
+
+  const resolvedTheme = useMemo(() => (themeMode === "dark" ? "zstar-night" : "zstar-day"), [themeMode]);
+
   const handleCodeUpdate = useCallback(
     (value: string | undefined) => {
       onCodeChange(value ?? "");
@@ -36,12 +36,7 @@ export const EditorPanel = memo(function EditorPanel({ code, onCodeChange, theme
   );
 
   return (
-    <div
-      className={cn(
-        EDITOR_PANEL_CLASS_NAME,
-        themeMode === "dark" ? "bg-[#121728]" : "bg-[#eef3ff]",
-      )}
-    >
+    <div className={cn("editor-panel-shell h-full w-full flex flex-col", themeMode === "dark" ? "editor-panel-dark" : "editor-panel-light")}>
       <div className="flex-1">
         <Editor
           height="100%"

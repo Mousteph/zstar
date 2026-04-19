@@ -71,6 +71,21 @@
     --ring: 220 10% 46%;
 
     --radius: 0.5rem;
+
+    --chart-positive: #10b981;
+    --chart-neutral: #3b82f6;
+    --chart-negative: #f43f5e;
+    --chart-candle-up: #22c55e;
+    --chart-candle-down: #ef4444;
+    --chart-exit: #f59e0b;
+    --chart-volume-up: #22c55e66;
+    --chart-volume-down: #ef444466;
+    --chart-tooltip-shadow: 0 4px 12px rgb(0 0 0 / 0.5);
+    --chart-axis: rgb(161, 161, 170);
+    --chart-grid: rgba(63, 63, 70, 0.35);
+    --chart-crosshair: rgba(161, 161, 170, 0.65);
+    --chart-border: rgb(63, 63, 70);
+    --chart-line-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
   }
 
   .light {
@@ -101,6 +116,15 @@
     --border: 220 16% 84%;
     --input: 220 16% 84%;
     --ring: 220 10% 46%;
+
+    --editor-panel-surface: #eef3ff;
+    --dashboard-panel-gradient-start: #f1f5f9;
+    --dashboard-panel-gradient-mid: #f8fafc;
+    --dashboard-panel-gradient-end: #f1f5f9;
+    --settings-panel-gradient-start: #f8fafc;
+    --settings-panel-gradient-mid: #fff;
+    --settings-panel-gradient-end: #f1f5f9;
+    --chart-expanded-overlay: rgb(255 255 255 / 0.95);
   }
 
   .dark {
@@ -131,6 +155,15 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+
+    --editor-panel-surface: #121728;
+    --dashboard-panel-gradient-start: #0a0d18;
+    --dashboard-panel-gradient-mid: #05070f;
+    --dashboard-panel-gradient-end: #04060c;
+    --settings-panel-gradient-start: #0d1322;
+    --settings-panel-gradient-mid: #090d18;
+    --settings-panel-gradient-end: #080b14;
+    --chart-expanded-overlay: rgb(7 11 20 / 0.95);
   }
 }
 
@@ -770,6 +803,44 @@
 
   .zstar-ai-hud__send-bubble:not(:disabled):focus-visible {
     border-color: color-mix(in srgb, var(--color-foreground) 38%, transparent);
+  }
+
+  .dashboard-panel-surface {
+    background: linear-gradient(
+      to bottom,
+      var(--dashboard-panel-gradient-start),
+      var(--dashboard-panel-gradient-mid),
+      var(--dashboard-panel-gradient-end)
+    );
+  }
+
+  .settings-panel-surface {
+    background: linear-gradient(
+      to bottom,
+      var(--settings-panel-gradient-start),
+      var(--settings-panel-gradient-mid),
+      var(--settings-panel-gradient-end)
+    );
+  }
+
+  .editor-panel-shell {
+    background-color: var(--editor-panel-surface);
+  }
+
+  .editor-panel-light {
+    --editor-panel-surface: #eef3ff;
+  }
+
+  .editor-panel-dark {
+    --editor-panel-surface: #121728;
+  }
+
+  .chart-expanded-surface {
+    background-color: var(--chart-expanded-overlay);
+  }
+
+  .equity-strategy-line {
+    filter: drop-shadow(var(--chart-line-shadow));
   }
 
   @media (max-width: 640px) {

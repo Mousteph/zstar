@@ -1,19 +1,22 @@
+"use client";
+
 import { memo } from "react";
 
-import { EquityCurveChart } from "@/features/backtest/components/EquityCurveChart";
-import { KpiCards } from "@/features/backtest/components/KpiCards";
-import { KpiTable } from "@/features/backtest/components/KpiTable";
-import { MarketOhlcvChart } from "@/features/backtest/components/MarketOhlcvChart";
-import { RecentTradesTable } from "@/features/backtest/components/RecentTradesTable";
+import { EquityCurveChart } from "@/components/organisms/backtest/EquityCurveChart";
+import { KpiCards } from "@/components/organisms/backtest/KpiCards";
+import { KpiTable } from "@/components/organisms/backtest/KpiTable";
+import { MarketOhlcvChart } from "@/components/organisms/backtest/MarketOhlcvChart";
+import { RecentTradesTable } from "@/components/organisms/backtest/RecentTradesTable";
 import type {
-  BacktestSettings,
   BacktestRunStatus,
+  BacktestSettings,
   EquityPoint,
   KpiMetric,
   KpiRow,
   MarketOhlcvPoint,
   Trade,
 } from "@/types/backtest";
+import type { ThemeMode } from "@/types/theme";
 
 interface DashboardPanelProps {
   readonly equityData: EquityPoint[];
@@ -23,6 +26,7 @@ interface DashboardPanelProps {
   readonly recentTrades: Trade[];
   readonly runStatus: BacktestRunStatus | null;
   readonly settings: BacktestSettings;
+  readonly themeMode: ThemeMode;
 }
 
 function formatHeroDate(dateValue: string): string {
@@ -47,14 +51,15 @@ export const DashboardPanel = memo(function DashboardPanel({
   recentTrades,
   runStatus,
   settings,
-}: DashboardPanelProps) {
+  themeMode,
+}: Readonly<DashboardPanelProps>) {
   const symbol = settings.symbol.trim().toUpperCase() || "—";
   const interval = settings.interval.trim() || "—";
   const startDate = formatHeroDate(settings.startDate);
   const endDate = formatHeroDate(settings.endDate);
 
   return (
-    <div className="relative isolate h-full min-h-0 overflow-x-hidden overflow-y-auto bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100 dark:from-[#0a0d18] dark:via-[#05070f] dark:to-[#04060c] px-5 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-7 lg:px-10">
+    <div className="dashboard-panel-surface relative isolate h-full min-h-0 overflow-x-hidden overflow-y-auto px-5 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-7 lg:px-10">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-28 top-[14%] h-80 w-80 rounded-full bg-emerald-400/20 dark:bg-emerald-400/10 blur-3xl" />
         <div className="absolute -right-20 top-[4%] h-72 w-72 rounded-full bg-sky-500/20 dark:bg-sky-500/10 blur-3xl" />
@@ -84,7 +89,9 @@ export const DashboardPanel = memo(function DashboardPanel({
                 <span
                   className={[
                     "mt-1 h-2 w-2 shrink-0 rounded-full",
-                    runStatus.tone === "error" ? "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.75)]" : "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.75)]",
+                    runStatus.tone === "error"
+                      ? "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.75)]"
+                      : "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.75)]",
                   ].join(" ")}
                   aria-hidden="true"
                 />
@@ -92,7 +99,9 @@ export const DashboardPanel = memo(function DashboardPanel({
                   <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
                     {runStatus.tone === "error" ? "Backtest Error" : "Backtest Status"}
                   </p>
-                  <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">{runStatus.message}</p>
+                  <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">
+                    {runStatus.message}
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -108,7 +117,7 @@ export const DashboardPanel = memo(function DashboardPanel({
         <EquityCurveChart data={equityData} />
         <KpiCards metrics={kpiMetrics} />
         <KpiTable rows={kpiRows} />
-        <MarketOhlcvChart data={marketOhlcvData} trades={recentTrades} />
+        <MarketOhlcvChart data={marketOhlcvData} trades={recentTrades} themeMode={themeMode} />
         <RecentTradesTable trades={recentTrades} />
       </div>
     </div>

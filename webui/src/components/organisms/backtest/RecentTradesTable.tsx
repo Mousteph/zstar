@@ -1,18 +1,10 @@
+"use client";
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/atoms/Table";
+import { SECTION_TITLE_CLASS_NAME, TABLE_HEADER_ROW_CLASS_NAME } from "@/features/backtest/constants";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  SECTION_TITLE_CLASS_NAME,
-  TABLE_HEADER_ROW_CLASS_NAME,
-} from "@/features/backtest/constants";
-import {
-  formatDateTime,
   formatCurrency,
+  formatDateTime,
   formatNumber,
   getTradePnlClassName,
   getTradeRowClassName,
@@ -24,7 +16,7 @@ interface RecentTradesTableProps {
   readonly trades: Trade[];
 }
 
-export function RecentTradesTable({ trades }: RecentTradesTableProps) {
+export function RecentTradesTable({ trades }: Readonly<RecentTradesTableProps>) {
   const sortedTrades = [...trades].sort(
     (a, b) => new Date(b.exit_datetime).getTime() - new Date(a.exit_datetime).getTime(),
   );
@@ -41,33 +33,15 @@ export function RecentTradesTable({ trades }: RecentTradesTableProps) {
         <Table>
           <TableHeader>
             <TableRow className={TABLE_HEADER_ROW_CLASS_NAME}>
-              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Entry Time
-              </TableHead>
-              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Exit Time
-              </TableHead>
-              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Symbol
-              </TableHead>
-              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Side
-              </TableHead>
-              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Size
-              </TableHead>
-              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Entry
-              </TableHead>
-              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Exit
-              </TableHead>
-              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Fees
-              </TableHead>
-              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">
-                Net PnL
-              </TableHead>
+              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Entry Time</TableHead>
+              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Exit Time</TableHead>
+              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Symbol</TableHead>
+              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Side</TableHead>
+              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Size</TableHead>
+              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Entry</TableHead>
+              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Exit</TableHead>
+              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Fees</TableHead>
+              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Net PnL</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

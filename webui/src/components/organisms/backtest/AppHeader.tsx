@@ -1,6 +1,8 @@
+"use client";
+
 import { Code2, Moon, Play, Settings2, Sun } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/atoms/Button";
 import type { ThemeMode } from "@/types/theme";
 
 interface AppHeaderProps {
@@ -24,7 +26,7 @@ export function AppHeader({
   onOpenSettings,
   onToggleCodeVisibility,
   onToggleTheme,
-}: AppHeaderProps) {
+}: Readonly<AppHeaderProps>) {
   const isDarkTheme = themeMode === "dark";
 
   return (

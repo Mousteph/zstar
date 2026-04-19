@@ -1,12 +1,14 @@
-import { getKpiToneStyles } from "@/features/backtest/utils";
+"use client";
+
 import { cn } from "@/lib/utils";
+import { getKpiToneStyles } from "@/features/backtest/utils";
 import type { KpiMetric } from "@/types/backtest";
 
 interface KpiCardsProps {
   readonly metrics: KpiMetric[];
 }
 
-export function KpiCards({ metrics }: KpiCardsProps) {
+export function KpiCards({ metrics }: Readonly<KpiCardsProps>) {
   if (metrics.length === 0) {
     return (
       <section className="border-b border-border/80 px-2 pb-9 sm:px-4 lg:px-6">
@@ -27,9 +29,7 @@ export function KpiCards({ metrics }: KpiCardsProps) {
               <p className={cn("text-5xl font-semibold leading-none tracking-[-0.03em] sm:text-6xl", valueClassName)}>
                 {metric.value}
               </p>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                {metric.label}
-              </h3>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{metric.label}</h3>
               <p className="max-w-[28ch] text-sm leading-relaxed text-muted-foreground">{metric.description}</p>
             </article>
           );
