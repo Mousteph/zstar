@@ -1,81 +1,28 @@
 from zstar.llm.models import StrategyGeneration
 from zstar.core.strategy import ValidateStrategy
 from ollama import chat
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Dict, Tuple
 import json
+import os
+
+
+class Response:
+    def __init__(self, strategy_generation: Optional[StrategyGeneration], error_message: str, raw_response: str):
+        self.strategy_generation = strategy_generation
+        self.error_message = error_message
+        self.raw_response = raw_response
 
 
 class CodeGenerator:
-    def __init__(self, model: str = "gemma4:e4b"):
-        self.model = model
-        self.schema = StrategyGeneration.model_json_schema()
-        self.validate_strategy = ValidateStrategy()
-
-        self.system_prompt = f"""
-        You generate valid JSON only.
-
-        Return exactly one JSON object that matches this JSON Schema:
-        {json.dumps(self.schema, indent=2)}
-
-        Rules:
-        - Output valid JSON only
-        - Do not use markdown fences
-        - Do not add explanations before or after the JSON
-        - The "code" field must be raw Python source as a string
-        - The code must define a subclass of CoreStrategy
-        - The code must create a global variable named strategy
-        - The code may use pandas as pd and numpy as np
-        - The code must not import arbitrary libraries unless explicitly allowed
-        """.strip()
-
-    
-    def generate_code(self, user_prompt: str) -> StrategyGeneration: 
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-
-        response = chat(
-            model=self.model,
-            messages=messages,
-            think=False,
-            stream=False,
-            options={"temperature": 0.5},
-            format=StrategyGeneration.model_json_schema()
-        )
-
-        return StrategyGeneration.model_validate_json(response.message.content)
 
 
-    def retry_generation(self, user_prompt: str, code_generated: StrategyGeneration, errors: List[str]) -> StrategyGeneration:
-        retry_message = f"""
-        The previous code generated failed validation steps:
+    def _load_prompt(self, filename: str) -> str:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(current_dir, filename), "r") as f:
+            return f.read()
 
-        Original user prompt:
-        {user_prompt}
 
-        Code generated:
-        {code_generated.code}
-
-        Validation errors:
-        {json.dumps(errors, indent=2)}
-
-        Return a full corrected JSON object matching the required schema exactly.
-
-        Rules:
-        - Output valid JSON only
-        - No markdown fences
-        - No explanation
-        - The python code must define a subclass of CoreStrategy
-        - The python code must create a global variable named strategy
-        - Fix all the listed errors in the code
-        """
-        
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": retry_message}
-        ]
-        
+    def _generate(self, messages: List[Dict[str, str]]) -> Tuple[Optional[StrategyGeneration], str, str]:
         response = chat(
             model=self.model,
             messages=messages,
@@ -85,64 +32,161 @@ class CodeGenerator:
             format=StrategyGeneration.model_json_schema()
         )
 
-        return StrategyGeneration.model_validate_json(response.message.content)
+        return self._parse_response(response.message.content)
+
+    
+    def _parse_response(self, response: str) -> Response:
+        try:
+            strategy_generation = StrategyGeneration.model_validate_json(response)
+            return Response(strategy_generation, "", response)
+        except Exception as exc:
+            print(f"Error parsing response: {exc}")
+            return Response(None, f"Error parsing response: {str(exc)}", response)
 
 
-    def get_strategy_code(
+    def _emit_progress(self, progress_callback: Optional[Callable[[str, str, str], None]], step_id: str, label: str, state: str) -> None:
+        print(f"Emitting progress: {step_id} - {label} - {state}")
+        
+        if progress_callback is None:
+            return
+
+        try:
+            progress_callback(step_id, label, state)
+        except Exception as exc:
+            print(f"Failed to emit progress: {step_id} - {label} - {state}")
+            print(f"Error: {exc}")
+            return
+
+
+    def __init__(self, model: str = "gemma4:e4b"):
+        self.model = model
+        self.schema = StrategyGeneration.model_json_schema()
+        self.validate_strategy = ValidateStrategy()
+        self.system_prompt = self._load_prompt("prompts/system_code_generator.txt")
+        self.retry_prompt = self._load_prompt("prompts/retry_code_generator.txt")
+
+    
+    def _validate_strategy_progress(self,
+            nb: int,
+            code: str,
+            progress_callback: Optional[Callable[[str, str, str], None]] = None
+    ) -> List[str]:
+        id_step = f"validate_syntax_{nb}"
+        self._emit_progress(progress_callback, id_step, "Validating syntax generated code...", "running")
+        
+        list_error = self.validate_strategy.validate(code)[1]
+        if len(list_error) == 0:
+            self._emit_progress(progress_callback, id_step, "Code generated is valid.", "done")
+        else:
+            self._emit_progress(progress_callback, id_step, "Error while validating syntax.", "done")
+
+        return list_error
+
+    
+    def _generate_code_progress(self, user_prompt: str, progress_callback: Optional[Callable[[str, str, str], None]] = None) -> Response:
+        id_step = "generate_code"
+        
+        self._emit_progress(progress_callback, id_step, "Generating code...", "running")
+        
+        response = self.generate_code(user_prompt)
+
+        if response.strategy_generation is None:
+            self._emit_progress(progress_callback, id_step, "Failed to generate code.", "done")
+        else:
+            self._emit_progress(progress_callback, id_step, "Code generation complete.", "done")
+
+        return response
+
+    
+    def generate_code(self, user_prompt: str) -> Response:
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        return self._generate(messages)
+
+
+    def _retry_generation_progress(self,
+        nb: int,
+        user_prompt: str,
+        code: str,
+        errors: List[str],
+        max_nb_errors: int,
+        progress_callback: Optional[Callable[[str, str, str], None]] = None
+    ) -> Response:
+        id_step = f"retry_generation_{nb}"
+        retry_label = f"{len(errors)} found, fixing errors. Retrying {nb}/{max_nb_errors})..."
+        self._emit_progress(progress_callback, id_step, retry_label, "running")
+        
+        response = self.retry_generation(user_prompt, code, errors)
+        if response.strategy_generation is None:
+            retry_label_done = f"Retry generation failed ({nb}/{max_nb_errors})."
+            self._emit_progress(progress_callback, id_step, retry_label_done, "done")
+        
+        else:
+            retry_label_done = f"Retry generation complete ({nb}/{max_nb_errors})."
+            self._emit_progress(progress_callback, id_step, retry_label_done, "done")
+
+        return response
+
+
+    def retry_generation(self, user_prompt: str, code: str, errors: List[str]) -> Response:
+        retry_message = self.retry_prompt.format(
+            user_prompt=user_prompt,
+            code=code,
+            errors=json.dumps(errors, indent=2)
+        )
+        
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": retry_message}
+        ]
+
+        return self._generate(messages)
+        
+
+    def generate_strategy_code(
         self,
         user_prompt: str,
         max_nb_errors: int = 2,
-        model: Optional[str] = None,
         progress_callback: Optional[Callable[[str, str, str], None]] = None,
     ) -> StrategyGeneration:
-        def emit_progress(step_id: str, label: str, state: str) -> None:
-            if progress_callback is None:
-                return
-
-            try:
-                progress_callback(step_id, label, state)
-            except Exception:
-                # Keep generation flow resilient if UI logging callback fails.
-                return
-
-        original_model = self.model
-        if model and model.strip():
-            self.model = model.strip()
-
         try:
-            print("Generating code...")
-            emit_progress("generate_code", "Generating code...", "running")
-            strategy_generation = self.generate_code(user_prompt)
-            print("Code generation complete.")
-            emit_progress("generate_code", "Generating code...", "done")
-
-            print("Validating syntax...")
-            validation_attempt = 1
-            validation_step_id = f"validate_syntax_{validation_attempt}"
-            emit_progress(validation_step_id, "Validating syntax...", "running")
-            list_error = self.validate_strategy.validate(strategy_generation.code)
-            emit_progress(validation_step_id, "Validating syntax...", "done")
             nb_error = 0
+            
+            response = self._generate_code_progress(user_prompt, progress_callback)
+            if response.strategy_generation is not None:
+                if not response.strategy_generation.can_answer:
+                    return response.strategy_generation
+
+                list_error = self._validate_strategy_progress(nb_error, response.strategy_generation.code, progress_callback)
+                code = response.strategy_generation.code
+            else:
+                list_error = [response.error_message]
+                code = response.raw_response
 
             while len(list_error) > 0 and nb_error < max_nb_errors:
                 nb_error += 1
-                print(f"Validation failed with {len(list_error)} error(s). Attempting retry {nb_error}...")
-                retry_step_id = f"retry_generation_{nb_error}"
-                retry_label = f"Validation failed ({len(list_error)}). Retrying ({nb_error}/{max_nb_errors})..."
-                emit_progress(retry_step_id, retry_label, "running")
-                strategy_generation = self.retry_generation(user_prompt, strategy_generation, list_error)
-                emit_progress(retry_step_id, retry_label, "done")
-                validation_attempt += 1
-                validation_step_id = f"validate_syntax_{validation_attempt}"
-                emit_progress(validation_step_id, "Validating syntax...", "running")
-                list_error = self.validate_strategy.validate(strategy_generation.code)
-                emit_progress(validation_step_id, "Validating syntax...", "done")
 
-            if len(list_error) > 0:
-                print("Validation of the generated code failed, please fix the code manually.")
+                response = self._retry_generation_progress(nb_error, user_prompt, code, list_error, max_nb_errors, progress_callback)
+                if response.strategy_generation is not None:
+                    list_error = self._validate_strategy_progress(nb_error, response.strategy_generation.code, progress_callback)
+                    code = response.strategy_generation.code
+                else:
+                    list_error = [response.error_message]
+                    code = response.raw_response
+
+
+            if response.strategy_generation is not None:
+                return response.strategy_generation
             else:
-                print("Code validated successfully!")
+                return StrategyGeneration(
+                    name="Error: Unable to generate valid strategy code",
+                    summary=f"Error: Unable to generate valid strategy code\n\n{response.error_message}",
+                    code="",
+                    can_answer=False
+                )
 
-            return strategy_generation
-        finally:
-            self.model = original_model
+        except Exception:
+            pass
