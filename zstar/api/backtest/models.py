@@ -1,13 +1,12 @@
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from zstar.core.backtest import BacktestConfigModel
 from zstar.core.data_loader import DataLoaderConfigModel
 
 
 class BacktestRunRequest(BaseModel):
-    strategy_code: str = Field(min_length=1, description="Python strategy source code")
     data: DataLoaderConfigModel
     backtest_config: BacktestConfigModel
 

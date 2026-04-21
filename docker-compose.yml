@@ -6,8 +6,6 @@ services:
       dockerfile: Dockerfile.backend
       target: dev
     container_name: zstar-backend-dev
-    environment:
-      OLLAMA_HOST: http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -39,8 +37,6 @@ services:
       dockerfile: Dockerfile.backend
       target: prd
     container_name: zstar-backend-prd
-    environment:
-      OLLAMA_HOST: http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -65,8 +61,6 @@ services:
       dockerfile: Dockerfile.backend
       target: prd
     container_name: zstar-backtest-cli
-    environment:
-      OLLAMA_HOST: http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
     working_dir: /app

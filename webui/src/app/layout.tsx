@@ -7,8 +7,9 @@ export const metadata: Metadata = {
   title: "ZStar",
 };
 
-const THEME_BOOTSTRAP_SCRIPT = `(function(){try{var persistedTheme=localStorage.getItem("zstar.theme");var themeClass=persistedTheme==="light"?"light":"dark";document.documentElement.classList.remove("dark","light");document.documentElement.classList.add(themeClass);}catch(error){document.documentElement.classList.remove("dark","light");document.documentElement.classList.add("dark");console.warn("Failed to read persisted theme from localStorage.",error);}})();`;
+const THEME_STORAGE_KEY = "zstar.theme";
 
+const THEME_BOOTSTRAP_SCRIPT = `(function(){try{var persistedTheme=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});var themeClass=persistedTheme==="light"?"light":"dark";document.documentElement.classList.remove("dark","light");document.documentElement.classList.add(themeClass);}catch(error){document.documentElement.classList.remove("dark","light");document.documentElement.classList.add("dark");console.warn("Failed to read persisted theme from localStorage.",error);}})();`;
 export default function RootLayout({
   children,
 }: Readonly<{

@@ -53,15 +53,6 @@ docker compose --profile dev up --build
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8000`
 
-If you use the AI assistant from Docker, run Ollama on your host machine first:
-
-```bash
-ollama serve
-ollama pull gemma4:e4b
-```
-
-The backend containers are configured to reach Ollama through `http://host.docker.internal:11434`.
-
 ### CLI backtest
 
 ```bash
@@ -153,4 +144,3 @@ Planned directions for ZStar:
 - Support additional market data sources beyond Yahoo Finance
 - Add paper trading and live monitoring workflows
 - Add optimization tools such as parameter tuning and walk-forward testing
-- Add an AI assistant in the Web UI to help explain strategies and backtest results
