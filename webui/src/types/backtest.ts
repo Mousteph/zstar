@@ -21,7 +21,6 @@ export interface BacktestRunStatus {
 }
 
 export interface BacktestRunRequest {
-  strategy_code: string;
   data: {
     symbol: string;
     start_date: string;

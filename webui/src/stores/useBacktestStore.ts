@@ -1,36 +1,29 @@
 import { create } from "zustand";
 
 import { runBacktest } from "@/features/backtest/api";
-import { defaultBacktestSettings, defaultStrategyCode } from "@/features/backtest/defaults";
+import { defaultBacktestSettings } from "@/features/backtest/defaults";
 import type { BacktestRunResponse, BacktestRunStatus, BacktestSettings } from "@/types/backtest";
 
 interface BacktestState {
   isRunning: boolean;
   settings: BacktestSettings;
-  strategyCode: string;
   backtestResult: BacktestRunResponse | null;
   runStatus: BacktestRunStatus | null;
   setSettings: (settings: BacktestSettings) => void;
-  setStrategyCode: (code: string) => void;
   runCurrentBacktest: () => Promise<void>;
 }
 
 export const useBacktestStore = create<BacktestState>((set, get) => ({
   isRunning: false,
   settings: defaultBacktestSettings,
-  strategyCode: defaultStrategyCode,
   backtestResult: null,
   runStatus: null,
   setSettings: (settings) =>
     set({
       settings,
     }),
-  setStrategyCode: (code) =>
-    set({
-      strategyCode: code,
-    }),
   runCurrentBacktest: async () => {
-    const { settings, strategyCode } = get();
+    const { settings } = get();
     set({ isRunning: true, runStatus: null });
 
     const slippageSeed = settings.slippageSeed.trim();
@@ -42,7 +35,6 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
 
     try {
       const result = await runBacktest({
-        strategy_code: strategyCode,
         data: {
           symbol: settings.symbol,
           start_date: settings.startDate,

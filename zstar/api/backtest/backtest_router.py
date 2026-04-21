@@ -1,5 +1,6 @@
 import math
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -9,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from zstar.core.trade_order import Trade
 from zstar.core.backtest import BacktestReport, BacktesterEngine
 from zstar.core.data_loader import YahooData
-from zstar.core.strategy import load_strategy_from_code
+from zstar.core.strategy import load_strategy_from_file
 from zstar.core.exceptions import BacktestServiceError
 
 from .models import (
@@ -26,6 +27,8 @@ responses = {
     400: {"description": "Error during backtest execution"},
     500: {"description": "Internal server error during backtest execution"},
 }
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_STRATEGY_FILE = PROJECT_ROOT / "strategies" / "default_strategy.py"
 
 
 def _safe_number(value: Any) -> Optional[float | str]:
@@ -126,7 +129,7 @@ def _serialize_market_ohlcv(report: BacktestReport) -> List[MarketOhlcvPointResp
 @router.post("/run", responses=responses)
 def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
     try:
-        strategy = load_strategy_from_code(request.strategy_code)
+        strategy = load_strategy_from_file(DEFAULT_STRATEGY_FILE)
         data_handler = YahooData(request.data)
         backtest_engine = BacktesterEngine(strategy, data_handler, request.backtest_config)
         report = backtest_engine.run_backtest()

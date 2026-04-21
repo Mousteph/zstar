@@ -6,12 +6,13 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 from zstar.core.backtest.backtest_report import BacktestReport
+from zstar.core.strategy import CoreStrategy
+from zstar.core.exceptions import StrategyValidationError
 from zstar.api.start_backend import app
 
 backtest_router_module = importlib.import_module("zstar.api.backtest.backtest_router")
 client = TestClient(app)
 
-VALID_STRATEGY_CODE = """
 class SimpleStrategy(CoreStrategy):
     def long_entry_signals(self, data):
         data["long_entry"] = 0
@@ -25,7 +26,6 @@ class SimpleStrategy(CoreStrategy):
 
     def position_size(self, balance, entry_price):
         return 1.0
-"""
 
 
 def test_health_endpoint_returns_ok():
@@ -35,9 +35,8 @@ def test_health_endpoint_returns_ok():
     assert response.json() == {"status": "ok"}
 
 
-def _payload(strategy_code: str = VALID_STRATEGY_CODE) -> dict:
+def _payload() -> dict:
     return {
-        "strategy_code": strategy_code,
         "data": {
             "symbol": "AAPL",
             "start_date": "2025-01-01",
@@ -81,6 +80,7 @@ def test_run_backtest_returns_complete_payload(monkeypatch):
             return self.interval
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
+    monkeypatch.setattr(backtest_router_module, "load_strategy_from_file", lambda _path: SimpleStrategy())
 
     response = client.post("/api/backtest/run", json=_payload())
 
@@ -110,7 +110,7 @@ def test_run_backtest_returns_complete_payload(monkeypatch):
     assert "worst_trade" in body["kpis"]
 
 
-def test_run_backtest_rejects_missing_strategy_instance(monkeypatch):
+def test_run_backtest_propagates_strategy_file_validation_errors(monkeypatch):
     class _FakeYahooData:
         def __init__(self, *_args, **_kwargs):
             self.data = _price_frame()
@@ -124,20 +124,12 @@ def test_run_backtest_rejects_missing_strategy_instance(monkeypatch):
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
 
-    response = client.post(
-        "/api/backtest/run",
-        json=_payload(
-            strategy_code="""
-class AlphaStrategy(CoreStrategy):
-    def position_size(self, balance, entry_price):
-        return 1.0
+    def _raise_strategy_error(_path):
+        raise StrategyValidationError("Multiple CoreStrategy subclasses found: AlphaStrategy, BetaStrategy")
 
-class BetaStrategy(CoreStrategy):
-    def position_size(self, balance, entry_price):
-        return 1.0
-""",
-        ),
-    )
+    monkeypatch.setattr(backtest_router_module, "load_strategy_from_file", _raise_strategy_error)
+
+    response = client.post("/api/backtest/run", json=_payload())
 
     assert response.status_code == 400
     assert "strategy_validation_error" in response.json()["detail"].lower()
@@ -157,6 +149,7 @@ def test_run_backtest_rejects_empty_market_data(monkeypatch):
             return self.interval
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
+    monkeypatch.setattr(backtest_router_module, "load_strategy_from_file", lambda _path: SimpleStrategy())
 
     response = client.post("/api/backtest/run", json=_payload())
 
@@ -177,6 +170,7 @@ def test_run_backtest_serializes_nan_and_inf_kpis_to_null(monkeypatch):
             return self.interval
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
+    monkeypatch.setattr(backtest_router_module, "load_strategy_from_file", lambda _path: SimpleStrategy())
 
     original_kpis = BacktestReport.kpis
 

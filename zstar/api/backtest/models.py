@@ -7,7 +7,6 @@ from zstar.core.data_loader import DataLoaderConfigModel
 
 
 class BacktestRunRequest(BaseModel):
-    strategy_code: str = Field(min_length=1, description="Python strategy source code")
     data: DataLoaderConfigModel
     backtest_config: BacktestConfigModel
 
