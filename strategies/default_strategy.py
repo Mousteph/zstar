@@ -41,7 +41,7 @@ class MovingAverageCrossStrategy(CoreStrategy):
 
     def position_size(self, balance: float, entry_price: float) -> float:
         if entry_price <= 0:
-            return 1.0
+            return 0.0
 
         max_risk = balance * (self.risk_pct / 100.0)
         return max(1.0, round(max_risk / entry_price, 4))
