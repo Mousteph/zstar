@@ -11,17 +11,17 @@ const TONE_STYLES: Record<KpiMetricTone, ToneStyles> = {
   positive: {
     iconClassName: "text-emerald-500",
     valueClassName: "text-emerald-500",
-    strokeColor: "#10b981",
+    strokeColor: "rgb(16 185 129)",
   },
   neutral: {
     iconClassName: "text-blue-500",
     valueClassName: "",
-    strokeColor: "#3b82f6",
+    strokeColor: "rgb(59 130 246)",
   },
   negative: {
     iconClassName: "text-rose-500",
     valueClassName: "text-rose-500",
-    strokeColor: "#f43f5e",
+    strokeColor: "rgb(244 63 94)",
   },
 };
 
@@ -69,10 +69,15 @@ export function getTradeSideBadgeClassName(side: TradeSide): string {
 }
 
 export function getTradePnlClassName(pnl: number): string {
-  return cn(
-    "text-right font-medium",
-    pnl > 0 ? "text-emerald-500" : pnl < 0 ? "text-rose-500" : "text-muted-foreground",
-  );
+  let pnlClassName = "text-muted-foreground";
+
+  if (pnl > 0) {
+    pnlClassName = "text-emerald-500";
+  } else if (pnl < 0) {
+    pnlClassName = "text-rose-500";
+  }
+
+  return cn("text-right font-medium", pnlClassName);
 }
 
 export function formatKpiLabel(key: string): string {
