@@ -1,17 +1,15 @@
 "use client";
 
-import { Code2, Moon, Play, Settings2, Sun } from "lucide-react";
+import { Moon, Play, Settings2, Sun } from "lucide-react";
 
 import { Button } from "@/components/atoms/Button";
 import type { ThemeMode } from "@/types/theme";
 
 interface AppHeaderProps {
   readonly isRunning: boolean;
-  readonly isCodeVisible: boolean;
   readonly themeMode: ThemeMode;
   readonly onRunBacktest: () => void;
   readonly onOpenSettings: () => void;
-  readonly onToggleCodeVisibility: () => void;
   readonly onToggleTheme: () => void;
 }
 
@@ -20,11 +18,9 @@ const HEADER_ACTION_CLASS_NAME =
 
 export function AppHeader({
   isRunning,
-  isCodeVisible,
   themeMode,
   onRunBacktest,
   onOpenSettings,
-  onToggleCodeVisibility,
   onToggleTheme,
 }: Readonly<AppHeaderProps>) {
   const isDarkTheme = themeMode === "dark";
@@ -71,18 +67,6 @@ export function AppHeader({
           >
             <Play className="h-4 w-4" />
             {isRunning ? "Running..." : "Run Backtest"}
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            className={`${HEADER_ACTION_CLASS_NAME} gap-2 px-3`}
-            onClick={onToggleCodeVisibility}
-            aria-label={isCodeVisible ? "Hide code" : "Show code"}
-            title={isCodeVisible ? "Hide code" : "Show code"}
-          >
-            <Code2 className="h-4 w-4" />
-            {isCodeVisible ? "Hide code" : "Show code"}
           </Button>
         </div>
       </div>
