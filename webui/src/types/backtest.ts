@@ -27,6 +27,7 @@ export interface BacktestRunRequest {
     end_date: string;
     interval: string;
   };
+  strategy_filename?: string;
   backtest_config: {
     initial_balance: number;
     entry_fee_pct: number;
@@ -94,4 +95,8 @@ export interface BacktestRunResponse {
   trades: Trade[];
   kpis: Record<string, number | string | null>;
   meta: BacktestMeta;
+}
+
+export interface StrategiesResponse {
+  strategies: string[];
 }

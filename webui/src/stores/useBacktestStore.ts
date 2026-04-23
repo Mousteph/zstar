@@ -10,7 +10,7 @@ interface BacktestState {
   backtestResult: BacktestRunResponse | null;
   runStatus: BacktestRunStatus | null;
   setSettings: (settings: BacktestSettings) => void;
-  runCurrentBacktest: () => Promise<void>;
+  runCurrentBacktest: (strategyFilename?: string) => Promise<void>;
 }
 
 export const useBacktestStore = create<BacktestState>((set, get) => ({
@@ -22,7 +22,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
     set({
       settings,
     }),
-  runCurrentBacktest: async () => {
+  runCurrentBacktest: async (strategyFilename) => {
     const { settings } = get();
     set({ isRunning: true, runStatus: null });
 
@@ -41,6 +41,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
           end_date: settings.endDate,
           interval: settings.interval,
         },
+        ...(strategyFilename ? { strategy_filename: strategyFilename } : {}),
         backtest_config: {
           initial_balance: settings.initialBalance,
           entry_fee_pct: settings.entryFeePct,

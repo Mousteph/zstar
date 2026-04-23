@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from zstar.api.backtest import backtest_router
+from zstar.api.strategies import strategies_router
 from zstar.api.settings import get_settings
 
 settings = get_settings("config.yaml")
@@ -17,6 +18,7 @@ app.add_middleware(
 )
 
 app.include_router(backtest_router)
+app.include_router(strategies_router)
 
 
 @app.get("/health")

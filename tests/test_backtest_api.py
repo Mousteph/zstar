@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -11,6 +12,7 @@ from zstar.core.exceptions import StrategyValidationError
 from zstar.api.start_backend import app
 
 backtest_router_module = importlib.import_module("zstar.api.backtest.backtest_router")
+file_utils_module = importlib.import_module("zstar.api.utils.file_utils")
 client = TestClient(app)
 
 class SimpleStrategy(CoreStrategy):
@@ -35,8 +37,8 @@ def test_health_endpoint_returns_ok():
     assert response.json() == {"status": "ok"}
 
 
-def _payload() -> dict:
-    return {
+def _payload(strategy_filename: str | None = None) -> dict:
+    payload = {
         "data": {
             "symbol": "AAPL",
             "start_date": "2025-01-01",
@@ -51,6 +53,9 @@ def _payload() -> dict:
             "slippage_seed": 42,
         },
     }
+    if strategy_filename is not None:
+        payload["strategy_filename"] = strategy_filename
+    return payload
 
 
 def _price_frame() -> pd.DataFrame:
@@ -108,6 +113,98 @@ def test_run_backtest_returns_complete_payload(monkeypatch):
     assert "sharpe_ratio" in body["kpis"]
     assert "best_trade" in body["kpis"]
     assert "worst_trade" in body["kpis"]
+
+
+def test_list_strategies_returns_python_filenames_without_extension(monkeypatch, tmp_path):
+    strategy_dir = tmp_path / "strategies"
+    strategy_dir.mkdir()
+    (strategy_dir / "alpha.py").write_text("print('alpha')", encoding="utf-8")
+    (strategy_dir / "zeta.py").write_text("print('zeta')", encoding="utf-8")
+    (strategy_dir / "notes.txt").write_text("ignore me", encoding="utf-8")
+    (strategy_dir / "nested").mkdir()
+    (strategy_dir / "nested" / "child.py").write_text("print('nested')", encoding="utf-8")
+
+    monkeypatch.setattr(file_utils_module, "STRATEGIES_DIR", strategy_dir)
+
+    response = client.get("/api/strategies")
+
+    assert response.status_code == 200
+    assert response.json() == {"strategies": ["alpha", "zeta"]}
+
+
+def test_run_backtest_uses_selected_strategy_filename(monkeypatch, tmp_path):
+    class _FakeYahooData:
+        def __init__(self, *_args, **_kwargs):
+            self.data = _price_frame()
+            self.interval = "1d"
+
+        def get_data(self):
+            return self.data.copy()
+
+        def get_interval(self):
+            return self.interval
+
+    loaded_paths: list[Path] = []
+
+    def _load_strategy(path: Path) -> SimpleStrategy:
+        loaded_paths.append(Path(path))
+        return SimpleStrategy()
+
+    strategy_dir = tmp_path / "strategies"
+    strategy_dir.mkdir()
+    (strategy_dir / "alpha_strategy.py").write_text("class Placeholder: pass", encoding="utf-8")
+
+    monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
+    monkeypatch.setattr(backtest_router_module, "load_strategy_from_file", _load_strategy)
+    monkeypatch.setattr(file_utils_module, "STRATEGIES_DIR", strategy_dir)
+
+    response = client.post("/api/backtest/run", json=_payload(strategy_filename="alpha_strategy"))
+
+    assert response.status_code == 200
+    assert loaded_paths[0].name == "alpha_strategy.py"
+    assert loaded_paths[0].parent.name == "strategies"
+
+
+def test_run_backtest_defaults_to_default_strategy_when_filename_missing(monkeypatch, tmp_path):
+    class _FakeYahooData:
+        def __init__(self, *_args, **_kwargs):
+            self.data = _price_frame()
+            self.interval = "1d"
+
+        def get_data(self):
+            return self.data.copy()
+
+        def get_interval(self):
+            return self.interval
+
+    loaded_paths: list[Path] = []
+
+    def _load_strategy(path: Path) -> SimpleStrategy:
+        loaded_paths.append(Path(path))
+        return SimpleStrategy()
+
+    strategy_dir = tmp_path / "strategies"
+    strategy_dir.mkdir()
+    (strategy_dir / "default_strategy.py").write_text("class Placeholder: pass", encoding="utf-8")
+
+    monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
+    monkeypatch.setattr(backtest_router_module, "load_strategy_from_file", _load_strategy)
+    monkeypatch.setattr(file_utils_module, "STRATEGIES_DIR", strategy_dir)
+
+    response = client.post("/api/backtest/run", json=_payload())
+
+    assert response.status_code == 200
+    assert loaded_paths[0].name == "default_strategy.py"
+    assert loaded_paths[0].parent.name == "strategies"
+
+
+def test_run_backtest_rejects_missing_strategy_file(monkeypatch):
+    response = client.post("/api/backtest/run", json=_payload(strategy_filename="unknown_strategy"))
+
+    assert response.status_code == 400
+    detail = response.json()["detail"].lower()
+    assert "strategy_validation_error" in detail
+    assert "unknown_strategy.py" in detail
 
 
 def test_run_backtest_propagates_strategy_file_validation_errors(monkeypatch):
