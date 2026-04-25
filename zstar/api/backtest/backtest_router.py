@@ -12,6 +12,7 @@ from zstar.core.data_loader import YahooData
 from zstar.core.strategy import load_strategy_from_file
 from zstar.core.exceptions import BacktestServiceError
 from zstar.api.utils import resolve_strategy_file
+from zstar.logger import get_logger
 
 from .models import (
     BacktestMetaResponse,
@@ -23,6 +24,7 @@ from .models import (
 )
 
 router = APIRouter(prefix="/api/backtest", tags=["backtest"])
+logger = get_logger(__name__)
 responses = {
     400: {"description": "Error during backtest execution"},
     500: {"description": "Internal server error during backtest execution"},
@@ -126,6 +128,14 @@ def _serialize_market_ohlcv(report: BacktestReport) -> List[MarketOhlcvPointResp
 
 @router.post("/run", responses=responses)
 def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
+    logger.info(
+        "Backtest requested symbol=%s interval=%s start_date=%s end_date=%s",
+        request.data.symbol,
+        request.data.interval,
+        request.data.start_date,
+        request.data.end_date,
+    )
+
     try:
         strategy_path = resolve_strategy_file(request.strategy_filename)
         strategy = load_strategy_from_file(strategy_path)
@@ -133,10 +143,18 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
         backtest_engine = BacktesterEngine(strategy, data_handler, request.backtest_config)
         report = backtest_engine.run_backtest()
         data = data_handler.get_data()
+        logger.info(
+            "Backtest completed symbol=%s bars_count=%s trades_count=%s",
+            request.data.symbol,
+            len(data),
+            len(report.trades),
+        )
 
     except BacktestServiceError as exc:
+        logger.warning("Backtest validation failed error=%s", exc.error_code)
         raise HTTPException(status_code=exc.status_code, detail=f"{exc.error_code}:\n- {str(exc)}") from exc
     except Exception as exc:
+        logger.exception("Backtest failed with internal error")
         raise HTTPException(status_code=500, detail=f"INTERNAL_SERVER_ERROR: {str(exc)}") from exc
 
     return BacktestRunResponse(

@@ -1,8 +1,10 @@
 import typer
 
+from zstar.config import LoggingConfig
 from zstar.core.backtest import BacktesterEngine
 from zstar.core.data_loader import YahooData
 from zstar.core.strategy import load_strategy_from_code
+from zstar.logger import get_logger, setup_logging
 from zstar.utils import read_yaml_file
 from .options import ConfigFileOption, StrategyFileOption
 from .runner import CliRunner
@@ -10,6 +12,7 @@ from .utils import read_strategy_code
 from .models import BacktestCliConfig
 
 app = typer.Typer(add_completion=False, help="ZStar command line interface.")
+logger = get_logger(__name__)
 
 
 @app.callback()
@@ -19,7 +22,9 @@ def cli_main() -> None:
 
 @app.command("backtest")
 def backtest_command(strategy_file: StrategyFileOption, config_file: ConfigFileOption) -> None:
-    print("Starting backtest...")
+    setup_logging(LoggingConfig())
+    logger.info("Starting backtest run from CLI")
+
     try:
         strategy_code = read_strategy_code(strategy_file)
         config_data = read_yaml_file(config_file)
@@ -36,8 +41,15 @@ def backtest_command(strategy_file: StrategyFileOption, config_file: ConfigFileO
         typer.echo(f"Number of bars processed: {len(yahoo_data.data)}")
         typer.echo(f"Output KPIs path: {kpis_output_path}")
         typer.echo(f"Output equity curve path: {equity_output_path}")
+        logger.info(
+            "CLI backtest completed bars_count=%s kpis_path=%s equity_curve_path=%s",
+            len(yahoo_data.data),
+            kpis_output_path,
+            equity_output_path,
+        )
 
     except RuntimeError as exc:
+        logger.error("CLI backtest failed error=%s", str(exc))
         typer.secho(str(exc), fg=typer.colors.RED)
-        
+
         raise typer.Exit(code=1) from exc

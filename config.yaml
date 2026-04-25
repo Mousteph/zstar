@@ -11,3 +11,10 @@ frontend:
 paths:
   strategies_dir: "strategies"
   default_strategy_name: "default_strategy"
+logging:
+  level: "DEBUG"
+  directory: "logs"
+  filename: "app.log"
+  max_bytes: 10485760
+  backup_count: 5
+  stdout: true

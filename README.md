@@ -107,6 +107,13 @@ frontend:
 paths:
   strategies_dir: "strategies"
   default_strategy_name: "default_strategy"
+logging:
+  level: "DEBUG"
+  directory: "logs"
+  filename: "app.log"
+  max_bytes: 10485760
+  backup_count: 5
+  stdout: true
 ```
 
 - `backend.host` and `backend.port` control the FastAPI server.
@@ -115,6 +122,10 @@ paths:
 - `frontend.backend_proxy_url` is the backend URL the Next.js server uses when proxying browser `/api/...` requests.
 - `paths.strategies_dir` points to the directory containing strategy files.
 - `paths.default_strategy_name` is the strategy filename stem used when an API request does not provide one.
+- `logging.level` sets the minimum log level to emit.
+- `logging.directory` and `logging.filename` define where rotated log files are written.
+- `logging.max_bytes` and `logging.backup_count` configure rotation (default `10MB`, keep `5` files).
+- `logging.stdout` controls whether logs are also emitted to stdout.
 
 Docker has one supported startup command:
 
