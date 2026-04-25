@@ -226,15 +226,7 @@ def _resolve_config_path(path: str | Path | None = None) -> Path:
 def _load_config_from_resolved_path(resolved_path: str) -> AppConfig:
     path = Path(resolved_path)
     data = _read_config_file(path)
-    if "logging" not in data:
-        data["logging"] = {
-            "level": "DEBUG",
-            "directory": "logs",
-            "filename": "app.log",
-            "max_bytes": 10 * 1024 * 1024,
-            "backup_count": 5,
-            "stdout": True,
-        }
+    data.setdefault("logging", {})
     try:
         return AppConfig.model_validate(data, context={"base_dir": path.parent})
     except ValidationError as exc:

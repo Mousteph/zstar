@@ -96,7 +96,9 @@ def setup_logging(config: LoggingConfig) -> Path:
 
     root_logger = logging.getLogger("zstar")
     root_logger.setLevel(getattr(logging, config.level))
-    root_logger.handlers.clear()
+    for handler in root_logger.handlers:
+        root_logger.removeHandler(handler)
+        handler.close()
     root_logger.propagate = False
 
     file_handler = RotatingFileHandler(

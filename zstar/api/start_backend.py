@@ -1,4 +1,6 @@
+from contextlib import asynccontextmanager
 import time
+from typing import AsyncIterator
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -10,12 +12,17 @@ from zstar.config import AppConfig, load_config
 from zstar.logger import clear_log_context, get_logger, set_log_context, setup_logging
 
 
-def create_app(settings: AppConfig | None = None) -> FastAPI:
+def create_app(settings: AppConfig | None = None, *, configure_logging: bool = True) -> FastAPI:
     app_settings = settings or load_config()
-    setup_logging(app_settings.logging)
     logger = get_logger(__name__)
 
-    application = FastAPI(title="ZStar Backtesting API", version="1.0.0")
+    @asynccontextmanager
+    async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
+        if configure_logging:
+            setup_logging(app_settings.logging)
+        yield
+
+    application = FastAPI(title="ZStar Backtesting API", version="1.0.0", lifespan=lifespan)
 
     application.add_middleware(
         CORSMiddleware,
