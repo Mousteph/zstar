@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from typing import Literal
 from urllib.parse import urlparse
 
 import yaml
@@ -99,12 +100,48 @@ class PathsConfig(BaseModel):
         return resolved
 
 
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+
+class LoggingConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", validate_default=True)
+
+    level: LogLevel = "DEBUG"
+    directory: Path = Field(default=Path("logs"))
+    filename: str = Field(default="app.log", min_length=1)
+    max_bytes: StrictInt = Field(default=10 * 1024 * 1024, ge=1)
+    backup_count: StrictInt = Field(default=5, ge=1)
+    stdout: bool = Field(default=True)
+
+    @field_validator("directory")
+    @classmethod
+    def validate_directory(cls, value: Path, info: Any) -> Path:
+        base_dir = Path(info.context["base_dir"]) if info.context and "base_dir" in info.context else Path.cwd()
+        resolved = value if value.is_absolute() else base_dir / value
+        return resolved.resolve()
+
+    @field_validator("filename")
+    @classmethod
+    def validate_filename(cls, value: str) -> str:
+        candidate = value.strip()
+        if not candidate:
+            raise ValueError("filename must be non-empty. Example: app.log")
+        if Path(candidate).name != candidate:
+            raise ValueError("filename must be a base file name without directories. Example: app.log")
+        return candidate
+
+    @property
+    def file_path(self) -> Path:
+        return self.directory / self.filename
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     backend: BackendConfig
     frontend: FrontendConfig
     paths: PathsConfig
+    logging: LoggingConfig
 
 
 FIELD_HINTS = {
@@ -119,6 +156,13 @@ FIELD_HINTS = {
     "paths": "Expected object with strategies_dir and default_strategy_name. Example: paths: {strategies_dir: 'strategies', default_strategy_name: 'default_strategy'}",
     "paths.strategies_dir": "Expected existing directory path. Example: strategies",
     "paths.default_strategy_name": "Expected base filename without extension. Example: default_strategy",
+    "logging": "Expected object with level, directory, filename, max_bytes, backup_count, and stdout.",
+    "logging.level": "Expected one of: DEBUG, INFO, WARNING, ERROR, CRITICAL. Example: INFO",
+    "logging.directory": "Expected relative or absolute path. Example: logs",
+    "logging.filename": "Expected filename without directories. Example: app.log",
+    "logging.max_bytes": "Expected positive integer. Example: 10485760",
+    "logging.backup_count": "Expected positive integer. Example: 5",
+    "logging.stdout": "Expected boolean. Example: true",
 }
 
 
@@ -159,12 +203,12 @@ def _read_config_file(path: Path) -> dict[str, Any]:
     if data is None:
         raise ConfigError(
             f"Configuration file '{path}' is empty. "
-            "Expected backend, frontend, and paths sections. Example: config.yaml"
+            "Expected backend, frontend, paths, and optional logging sections. Example: config.yaml"
         )
     if not isinstance(data, dict):
         raise ConfigError(
             f"Configuration file '{path}' must contain a YAML object. "
-            "Expected top-level fields: backend, frontend, paths."
+            "Expected top-level fields: backend, frontend, paths, and optional logging."
         )
 
     return data
@@ -182,6 +226,7 @@ def _resolve_config_path(path: str | Path | None = None) -> Path:
 def _load_config_from_resolved_path(resolved_path: str) -> AppConfig:
     path = Path(resolved_path)
     data = _read_config_file(path)
+    data.setdefault("logging", {})
     try:
         return AppConfig.model_validate(data, context={"base_dir": path.parent})
     except ValidationError as exc:

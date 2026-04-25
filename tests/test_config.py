@@ -50,6 +50,8 @@ def test_load_config_reads_valid_yaml(tmp_path):
     assert config.backend.allow_origins == ("http://localhost:3000",)
     assert config.frontend.backend_proxy_url == "http://backend:8000"
     assert config.paths.strategies_dir == strategies_dir.resolve()
+    assert config.logging.level == "DEBUG"
+    assert config.logging.file_path == (config_path.parent / "logs" / "app.log").resolve()
 
 
 def test_load_config_raises_clear_error_for_missing_file(tmp_path):
@@ -186,3 +188,40 @@ def test_get_settings_shim_uses_canonical_config_loader(tmp_path):
 
     assert settings.backend.port == 8000
     assert settings.paths.default_strategy_name == "default_strategy"
+
+
+def test_load_config_uses_explicit_logging_level(tmp_path):
+    clear_config_cache()
+    strategies_dir = tmp_path / "strategies"
+    strategies_dir.mkdir()
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "backend:",
+                '  host: "0.0.0.0"',
+                "  port: 8000",
+                "  allow_origins:",
+                '    - "http://localhost:3000"',
+                "frontend:",
+                '  host: "0.0.0.0"',
+                "  port: 3000",
+                '  backend_proxy_url: "http://backend:8000"',
+                "paths:",
+                f'  strategies_dir: "{strategies_dir}"',
+                '  default_strategy_name: "default_strategy"',
+                "logging:",
+                '  level: "ERROR"',
+                '  directory: "logs"',
+                '  filename: "app.log"',
+                "  max_bytes: 10485760",
+                "  backup_count: 5",
+                "  stdout: false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.logging.level == "ERROR"
