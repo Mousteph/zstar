@@ -1,69 +1,24 @@
 services:
-  backend-dev:
-    profiles: ["dev"]
+  backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-      target: dev
-    container_name: zstar-backend-dev
+    container_name: zstar-backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - ./config.yaml:/app/config.yaml:ro
 
-  frontend-dev:
-    profiles: ["dev"]
+  frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      target: dev
-    container_name: zstar-frontend-dev
-    environment:
-      NEXT_BACKEND_PROXY_TARGET: http://backend-dev:8000
+    container_name: zstar-frontend
+    depends_on:
+      - backend
     ports:
       - "3000:3000"
-    command: >
-      sh -c "if [ ! -d /app/webui/node_modules ] || [ ! -f /app/webui/node_modules/.zstar_lock ] || ! cmp -s /app/webui/package-lock.json /app/webui/node_modules/.zstar_lock; then npm ci && cp /app/webui/package-lock.json /app/webui/node_modules/.zstar_lock; fi; npm run dev"
     volumes:
-      - .:/app
-      - /app/webui/node_modules
-
-  backend-prd:
-    profiles: ["prd"]
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-      target: prd
-    container_name: zstar-backend-prd
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "8000:8000"
-
-  frontend-prd:
-    profiles: ["prd"]
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      target: prd
-      args:
-        NEXT_BACKEND_PROXY_TARGET: http://backend-prd:8000
-    container_name: zstar-frontend-prd
-    ports:
-      - "3000:3000"
-
-  backtest-cli:
-    profiles: ["cli"]
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-      target: prd
-    container_name: zstar-backtest-cli
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    working_dir: /app
-    entrypoint: ["python", "-m", "zstar.cli"]
-    volumes:
-      - .:/app
+      - ./config.yaml:/app/config.yaml:ro

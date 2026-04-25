@@ -30,6 +30,17 @@ class SimpleStrategy(CoreStrategy):
         return 1.0
 
 
+class _FakePaths:
+    def __init__(self, strategies_dir: Path, default_strategy_name: str = "default_strategy") -> None:
+        self.strategies_dir = strategies_dir
+        self.default_strategy_name = default_strategy_name
+
+
+class _FakeConfig:
+    def __init__(self, strategies_dir: Path, default_strategy_name: str = "default_strategy") -> None:
+        self.paths = _FakePaths(strategies_dir, default_strategy_name)
+
+
 def test_health_endpoint_returns_ok():
     response = client.get("/health")
 
@@ -124,7 +135,7 @@ def test_list_strategies_returns_python_filenames_without_extension(monkeypatch,
     (strategy_dir / "nested").mkdir()
     (strategy_dir / "nested" / "child.py").write_text("print('nested')", encoding="utf-8")
 
-    monkeypatch.setattr(file_utils_module, "STRATEGIES_DIR", strategy_dir)
+    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
 
     response = client.get("/api/strategies")
 
@@ -156,7 +167,7 @@ def test_run_backtest_uses_selected_strategy_filename(monkeypatch, tmp_path):
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
     monkeypatch.setattr(backtest_router_module, "load_strategy_from_file", _load_strategy)
-    monkeypatch.setattr(file_utils_module, "STRATEGIES_DIR", strategy_dir)
+    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
 
     response = client.post("/api/backtest/run", json=_payload(strategy_filename="alpha_strategy"))
 
@@ -189,7 +200,7 @@ def test_run_backtest_defaults_to_default_strategy_when_filename_missing(monkeyp
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
     monkeypatch.setattr(backtest_router_module, "load_strategy_from_file", _load_strategy)
-    monkeypatch.setattr(file_utils_module, "STRATEGIES_DIR", strategy_dir)
+    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
 
     response = client.post("/api/backtest/run", json=_payload())
 
