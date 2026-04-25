@@ -1,13 +1,13 @@
 import { spawn } from "node:child_process";
 
-import { appConfig } from "./read-config.mjs";
+import { getAppConfig } from "../src/server/read-config.mjs";
 
 const mode = process.argv[2];
 if (!["dev", "start"].includes(mode)) {
   throw new Error("Usage: node scripts/start-next.mjs dev|start");
 }
 
-const { host, port } = appConfig.frontend;
+const { host, port } = getAppConfig().frontend;
 
 const child = spawn(
   "npm",

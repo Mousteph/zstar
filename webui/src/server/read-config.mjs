@@ -2,8 +2,18 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse } from "yaml";
 
+/**
+ * @typedef {object} FrontendConfig
+ * @property {string} host
+ * @property {number} port
+ * @property {string} backend_proxy_url
+ *
+ * @typedef {object} WebConfig
+ * @property {FrontendConfig} frontend
+ */
+
 function configPath() {
-  for (const candidate of ["config.yaml", "../config.yaml"]) {
+  for (const candidate of ["config.yaml", "../config.yaml", "/app/config.yaml"]) {
     const resolved = resolve(candidate);
     if (existsSync(resolved)) {
       return resolved;
@@ -22,13 +32,16 @@ function assertString(value, fieldName) {
 }
 
 function assertPort(value, fieldName) {
-  if (!Number.isInteger(value) || value < 1 || value > 65535) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 65535) {
     throw new Error(`Invalid config field '${fieldName}'. Expected integer from 1 to 65535.`);
   }
 
   return value;
 }
 
+/**
+ * @returns {WebConfig}
+ */
 function readConfig() {
   const path = configPath();
   const config = parse(readFileSync(path, "utf8"));
@@ -46,4 +59,17 @@ function readConfig() {
   };
 }
 
-export const appConfig = readConfig();
+/** @type {WebConfig | null} */
+let cachedConfig = null;
+
+/**
+ * @returns {WebConfig}
+ */
+export function getAppConfig() {
+  if (cachedConfig !== null) {
+    return cachedConfig;
+  }
+
+  cachedConfig = readConfig();
+  return cachedConfig;
+}
