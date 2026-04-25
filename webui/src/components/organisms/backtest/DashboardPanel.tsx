@@ -25,6 +25,7 @@ interface DashboardPanelProps {
   readonly kpiRows: KpiRow[];
   readonly recentTrades: Trade[];
   readonly runStatus: BacktestRunStatus | null;
+  readonly selectedStrategy: string;
   readonly settings: BacktestSettings;
   readonly themeMode: ThemeMode;
 }
@@ -50,6 +51,7 @@ export const DashboardPanel = memo(function DashboardPanel({
   kpiRows,
   recentTrades,
   runStatus,
+  selectedStrategy,
   settings,
   themeMode,
 }: Readonly<DashboardPanelProps>) {
@@ -71,6 +73,9 @@ export const DashboardPanel = memo(function DashboardPanel({
           <div className="relative flex min-h-[34svh] flex-col justify-center lg:min-h-[44svh]">
             <p className="hero-line-animation text-[0.7rem] uppercase tracking-[0.24em] text-muted-foreground">
               Backtest Snapshot
+              <span className="ml-2 inline-block normal-case tracking-[0.08em] text-foreground/80">
+                {selectedStrategy}
+              </span>
             </p>
             <h2 className="hero-title-animation mt-3 font-display text-[clamp(3.75rem,12vw,10rem)] font-semibold leading-[0.9] tracking-[-0.04em] text-foreground">
               Backtest

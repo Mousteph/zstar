@@ -9,6 +9,7 @@ from zstar.core.data_loader import DataLoaderConfigModel
 class BacktestRunRequest(BaseModel):
     data: DataLoaderConfigModel
     backtest_config: BacktestConfigModel
+    strategy_filename: Optional[str] = None
 
 
 class EquityPointResponse(BaseModel): 
