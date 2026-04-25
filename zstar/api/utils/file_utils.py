@@ -1,12 +1,21 @@
 from pathlib import Path
 from typing import Optional
 
-from zstar.api.constants import DEFAULT_STRATEGY_NAME, PYTHON_FILE_SUFFIX, STRATEGIES_DIR
+from zstar.api.constants import PYTHON_FILE_SUFFIX
+from zstar.config import load_config
 from zstar.core.exceptions import StrategyValidationError
 
 
+def _configured_strategies_dir() -> Path:
+    return load_config().paths.strategies_dir
+
+
+def _configured_default_strategy_name() -> str:
+    return load_config().paths.default_strategy_name
+
+
 def list_strategy_filenames(strategies_dir: Optional[Path] = None) -> list[str]:
-    target_dir = strategies_dir or STRATEGIES_DIR
+    target_dir = strategies_dir or _configured_strategies_dir()
     if not target_dir.exists():
         return []
 
@@ -19,11 +28,11 @@ def list_strategy_filenames(strategies_dir: Optional[Path] = None) -> list[str]:
 
 def normalize_strategy_filename(strategy_filename: Optional[str]) -> str:
     if strategy_filename is None:
-        return DEFAULT_STRATEGY_NAME
+        return _configured_default_strategy_name()
 
     normalized = strategy_filename.strip()
     if not normalized:
-        return DEFAULT_STRATEGY_NAME
+        return _configured_default_strategy_name()
 
     if normalized.endswith(PYTHON_FILE_SUFFIX):
         normalized = normalized[: -len(PYTHON_FILE_SUFFIX)].strip()
@@ -39,7 +48,7 @@ def normalize_strategy_filename(strategy_filename: Optional[str]) -> str:
 
 def resolve_strategy_file(strategy_filename: Optional[str], strategies_dir: Optional[Path] = None) -> Path:
     normalized_name = normalize_strategy_filename(strategy_filename)
-    target_dir = strategies_dir or STRATEGIES_DIR
+    target_dir = strategies_dir or _configured_strategies_dir()
     strategy_path = (target_dir / f"{normalized_name}{PYTHON_FILE_SUFFIX}").resolve()
     strategies_root = target_dir.resolve()
 

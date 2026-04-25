@@ -37,17 +37,16 @@ cd zstar
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp config_example.yaml config.yaml
 ```
 
-`config.yaml` controls backend host, port, and allowed origins.
+`config.yaml` controls backend/frontend host settings, API proxying, CORS origins, and strategy paths.
 
 ## Quick Start
 
 ### Web UI with Docker (recommended)
 
 ```bash
-docker compose --profile dev up --build
+docker compose up --build
 ```
 
 - Frontend: `http://localhost:3000`
@@ -79,10 +78,59 @@ Frontend:
 ```bash
 cd webui
 npm ci
-npm run dev
+node scripts/start-next.mjs dev
 ```
 
-The Next.js dev server proxies `/api` requests to `http://localhost:8000` by default.
+The Next.js dev server proxies `/api` requests to the `frontend.backend_proxy_url` value in your config file.
+For local frontend development outside Docker, set `frontend.backend_proxy_url` to `http://localhost:8000`.
+
+## How to Configure Your Instance
+
+ZStar reads `config.yaml` on startup. Docker mounts the repository `config.yaml` as `/app/config.yaml`, and local commands read the same file by default.
+
+```bash
+python -m zstar.api
+```
+
+Configuration files use this schema:
+
+```yaml
+backend:
+  host: "0.0.0.0"
+  port: 8000
+  allow_origins:
+    - "http://localhost:3000"
+frontend:
+  host: "0.0.0.0"
+  port: 3000
+  backend_proxy_url: "http://backend:8000"
+paths:
+  strategies_dir: "strategies"
+  default_strategy_name: "default_strategy"
+```
+
+- `backend.host` and `backend.port` control the FastAPI server.
+- `backend.allow_origins` controls CORS origins and must contain full `http://` or `https://` origins.
+- `frontend.host` and `frontend.port` control the Next.js Docker startup values.
+- `frontend.backend_proxy_url` is the backend URL the Next.js server uses when proxying browser `/api/...` requests.
+- `paths.strategies_dir` points to the directory containing strategy files.
+- `paths.default_strategy_name` is the strategy filename stem used when an API request does not provide one.
+
+Docker has one supported startup command:
+
+```bash
+docker compose up --build
+```
+
+Compose mounts `config.yaml` as `/app/config.yaml` for both backend and frontend containers.
+When using Docker, keep `backend.port` at `8000` and `frontend.port` at `3000`, or update the matching Compose `ports` mappings at the same time. Docker Compose can read a `.env` file for variable interpolation, but it cannot read values directly out of `config.yaml`; using both would create two config sources that can drift.
+
+Config validation fails fast. Common fixes:
+
+- Missing config: make sure `config.yaml` exists in the repository root.
+- Invalid URL: include the scheme, for example `http://localhost:3000`.
+- Invalid port: use an integer from `1` to `65535`, for example `8000`.
+- Invalid strategy path: make sure `paths.strategies_dir` points to an existing directory.
 
 ## Use From Python
 

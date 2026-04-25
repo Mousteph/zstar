@@ -1,12 +1,17 @@
+import sys
+
 import uvicorn
-from zstar.api.settings import get_settings
+from zstar.api.start_backend import create_app
+from zstar.config import load_config
 
 
 if __name__ == "__main__":
-    settings = get_settings("config.yaml")
+    config_path = sys.argv[1] if len(sys.argv) > 1 else None
+    settings = load_config(config_path)
+    app = create_app(settings)
 
     uvicorn.run(
-        "zstar.api.start_backend:app",
-        host=settings.backend_host,
-        port=settings.backend_port
+        app,
+        host=settings.backend.host,
+        port=settings.backend.port,
     )
