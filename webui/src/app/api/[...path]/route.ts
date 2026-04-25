@@ -1,51 +1,11 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { NextRequest } from "next/server";
+
+import { appConfig } from "@/server/config";
 
 export const runtime = "nodejs";
 
-function defaultConfigPath(): string {
-  for (const candidate of ["config.yaml", "../config.yaml"]) {
-    const resolved = resolve(candidate);
-    if (existsSync(resolved)) {
-      return resolved;
-    }
-  }
-
-  return resolve("config.yaml");
-}
-
-function configValue(sectionName: string, fieldName: string): string {
-  const configPath = defaultConfigPath();
-  const configText = readFileSync(configPath, "utf8");
-  const lines = configText.split(/\r?\n/);
-  let inSection = false;
-
-  for (const line of lines) {
-    if (line.trim().startsWith("#") || line.trim() === "") {
-      continue;
-    }
-
-    if (!line.startsWith(" ") && !line.startsWith("\t")) {
-      inSection = line.trim() === `${sectionName}:`;
-      continue;
-    }
-
-    if (!inSection) {
-      continue;
-    }
-
-    const match = line.match(new RegExp(`^\\s{2}${fieldName}:\\s*["']?([^"'\\n#]+)["']?\\s*(?:#.*)?$`));
-    if (match) {
-      return match[1].trim();
-    }
-  }
-
-  throw new Error(`Missing '${sectionName}.${fieldName}' in ${configPath}.`);
-}
-
 function backendUrl(path: string[]): string {
-  const backendProxyTarget = configValue("frontend", "backend_proxy_url");
+  const backendProxyTarget = appConfig.frontend.backend_proxy_url;
   const baseUrl = backendProxyTarget.replace(/\/$/, "");
   return `${baseUrl}/api/${path.map(encodeURIComponent).join("/")}`;
 }

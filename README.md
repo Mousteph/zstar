@@ -123,6 +123,7 @@ docker compose up --build
 ```
 
 Compose mounts `config.yaml` as `/app/config.yaml` for both backend and frontend containers.
+When using Docker, keep `backend.port` at `8000` and `frontend.port` at `3000`, or update the matching Compose `ports` mappings at the same time. Docker Compose can read a `.env` file for variable interpolation, but it cannot read values directly out of `config.yaml`; using both would create two config sources that can drift.
 
 Config validation fails fast. Common fixes:
 
