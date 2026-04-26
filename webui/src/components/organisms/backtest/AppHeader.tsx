@@ -8,6 +8,7 @@ import type { ThemeMode } from "@/types/theme";
 
 interface AppHeaderProps {
   readonly isRunning: boolean;
+  readonly isValidating: boolean;
   readonly selectedStrategy: string;
   readonly strategyOptions: string[];
   readonly isStrategyMenuOpen: boolean;
@@ -15,6 +16,7 @@ interface AppHeaderProps {
   readonly strategiesError: string | null;
   readonly themeMode: ThemeMode;
   readonly onRunBacktest: () => void;
+  readonly onCheckCode: () => void;
   readonly onOpenSettings: () => void;
   readonly onToggleTheme: () => void;
   readonly onToggleStrategyMenu: () => void;
@@ -27,6 +29,7 @@ const HEADER_ACTION_CLASS_NAME =
 
 export function AppHeader({
   isRunning,
+  isValidating,
   selectedStrategy,
   strategyOptions,
   isStrategyMenuOpen,
@@ -34,6 +37,7 @@ export function AppHeader({
   strategiesError,
   themeMode,
   onRunBacktest,
+  onCheckCode,
   onOpenSettings,
   onToggleTheme,
   onToggleStrategyMenu,
@@ -159,8 +163,18 @@ export function AppHeader({
             type="button"
             variant="ghost"
             className={`${HEADER_ACTION_CLASS_NAME} gap-2 px-3`}
+            onClick={onCheckCode}
+            disabled={isRunning || isValidating}
+          >
+            {isValidating ? "Checking..." : "Check Code"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            className={`${HEADER_ACTION_CLASS_NAME} gap-2 px-3`}
             onClick={onRunBacktest}
-            disabled={isRunning}
+            disabled={isRunning || isValidating}
           >
             <Play className="h-4 w-4" />
             {isRunning ? "Running..." : "Run Backtest"}

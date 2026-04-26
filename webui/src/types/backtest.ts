@@ -20,6 +20,29 @@ export interface BacktestRunStatus {
   message: string;
 }
 
+export type ValidationSeverity = "error";
+export type ValidationCategory = "syntax" | "template" | "type" | "logic";
+
+export interface ValidationIssue {
+  severity: ValidationSeverity;
+  category: ValidationCategory;
+  file: string;
+  line: number | null;
+  message: string;
+}
+
+export interface StrategyValidationResult {
+  strategy_filename: string;
+  ready_to_backtest: boolean;
+  total_errors: number;
+  issues: ValidationIssue[];
+  summary_text: string;
+}
+
+export interface ValidateStrategyRequest {
+  strategy_filename?: string;
+}
+
 export interface BacktestRunRequest {
   data: {
     symbol: string;

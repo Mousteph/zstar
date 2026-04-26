@@ -9,8 +9,8 @@ from fastapi import APIRouter, HTTPException
 from zstar.core.trade_order import Trade
 from zstar.core.backtest import BacktestReport, BacktesterEngine
 from zstar.core.data_loader import YahooData
-from zstar.core.strategy import load_strategy_from_file
-from zstar.core.exceptions import BacktestServiceError
+from zstar.core.strategy import ValidateStrategy
+from zstar.core.exceptions import BacktestServiceError, StrategyValidationError
 from zstar.api.utils import resolve_strategy_file
 from zstar.logger import get_logger
 
@@ -138,7 +138,20 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
 
     try:
         strategy_path = resolve_strategy_file(request.strategy_filename)
-        strategy = load_strategy_from_file(strategy_path)
+        validator = ValidateStrategy(strategy_path=strategy_path)
+        strategy, validation_result = validator.validate_file()
+        if validation_result.total_errors > 0:
+            error_lines = [
+                f"{issue.category}: {issue.message}" + (f" (line {issue.line})" if issue.line is not None else "")
+                for issue in validation_result.issues
+                if issue.severity == "error"
+            ]
+            raise StrategyValidationError(
+                "Strategy validation failed before backtest.\n- " + "\n- ".join(error_lines)
+            )
+        if strategy is None:
+            raise StrategyValidationError("Strategy could not be instantiated after validation.")
+
         data_handler = YahooData(request.data)
         backtest_engine = BacktesterEngine(strategy, data_handler, request.backtest_config)
         report = backtest_engine.run_backtest()

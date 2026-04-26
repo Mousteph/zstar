@@ -14,6 +14,7 @@ import type {
   KpiMetric,
   KpiRow,
   MarketOhlcvPoint,
+  StrategyValidationResult,
   Trade,
 } from "@/types/backtest";
 import type { ThemeMode } from "@/types/theme";
@@ -25,9 +26,12 @@ interface DashboardPanelProps {
   readonly kpiRows: KpiRow[];
   readonly recentTrades: Trade[];
   readonly runStatus: BacktestRunStatus | null;
+  readonly validationResult: StrategyValidationResult | null;
+  readonly isValidating: boolean;
   readonly selectedStrategy: string;
   readonly settings: BacktestSettings;
   readonly themeMode: ThemeMode;
+  readonly onExportValidationReport: (format: "txt" | "json") => void;
 }
 
 function formatHeroDate(dateValue: string): string {
@@ -51,9 +55,12 @@ export const DashboardPanel = memo(function DashboardPanel({
   kpiRows,
   recentTrades,
   runStatus,
+  validationResult,
+  isValidating,
   selectedStrategy,
   settings,
   themeMode,
+  onExportValidationReport,
 }: Readonly<DashboardPanelProps>) {
   const symbol = settings.symbol.trim().toUpperCase() || "—";
   const interval = settings.interval.trim() || "—";
@@ -80,42 +87,110 @@ export const DashboardPanel = memo(function DashboardPanel({
             <h2 className="hero-title-animation mt-3 font-display text-[clamp(3.75rem,12vw,10rem)] font-semibold leading-[0.9] tracking-[-0.04em] text-foreground">
               Backtest
             </h2>
-            {runStatus ? (
-              <div
-                className={[
-                  "status-line-animation mt-5 inline-flex max-w-[min(100%,30rem)] items-start gap-3 self-start rounded-2xl border px-4 py-3 backdrop-blur-sm",
-                  runStatus.tone === "error"
-                    ? "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]"
-                    : "border-emerald-400/30 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]",
-                ].join(" ")}
-                role={runStatus.tone === "error" ? "alert" : undefined}
-                aria-live={runStatus.tone === "error" ? "assertive" : "polite"}
-              >
-                <span
-                  className={[
-                    "mt-1 h-2 w-2 shrink-0 rounded-full",
-                    runStatus.tone === "error"
-                      ? "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.75)]"
-                      : "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.75)]",
-                  ].join(" ")}
-                  aria-hidden="true"
-                />
-                <div className="space-y-1">
-                  <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
-                    {runStatus.tone === "error" ? "Backtest Error" : "Backtest Status"}
-                  </p>
-                  <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">
-                    {runStatus.message}
-                  </p>
-                </div>
-              </div>
-            ) : null}
             <p className="hero-line-animation-delay-1 mt-5 text-base font-medium tracking-wide text-foreground/85 sm:text-lg">
               {symbol} - {interval}
             </p>
             <p className="hero-line-animation-delay-2 mt-1 text-sm tracking-wide text-muted-foreground sm:text-base">
               {startDate} - {endDate}
             </p>
+            <div className="status-line-animation mt-5 w-full space-y-3">
+              <div
+                className={[
+                  "w-full rounded-2xl border px-4 py-3 backdrop-blur-sm",
+                  validationResult?.ready_to_backtest
+                    ? "border-blue-500/30 bg-blue-500/10 text-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]"
+                    : "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]",
+                ].join(" ")}
+                role={validationResult && !validationResult.ready_to_backtest ? "alert" : undefined}
+                aria-live={validationResult && !validationResult.ready_to_backtest ? "assertive" : "polite"}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
+                      Strategy Validation
+                    </p>
+                    <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">
+                      {isValidating
+                        ? "Checking strategy code..."
+                        : validationResult
+                          ? validationResult.ready_to_backtest
+                            ? "Ready to backtest"
+                            : validationResult.summary_text
+                          : "Run Check Code to validate strategy file."}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="rounded-md border border-current/30 px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => {
+                        onExportValidationReport("txt");
+                      }}
+                      disabled={!validationResult}
+                    >
+                      Export TXT
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-current/30 px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => {
+                        onExportValidationReport("json");
+                      }}
+                      disabled={!validationResult}
+                    >
+                      Export JSON
+                    </button>
+                  </div>
+                </div>
+
+                {validationResult && validationResult.issues.length > 0 ? (
+                  <ul className="mt-3 space-y-2 border-t border-current/20 pt-3">
+                    {validationResult.issues.map((issue, index) => (
+                      <li key={`${issue.file}-${issue.line ?? "na"}-${issue.category}-${index}`}>
+                        <p className="text-xs uppercase tracking-[0.16em] text-current/75">
+                          [{issue.severity}] [{issue.category}] {issue.file}
+                          {issue.line === null ? "" : `:${issue.line}`}
+                        </p>
+                        <p className="whitespace-pre-wrap font-mono text-xs leading-5 text-current sm:text-sm">
+                          {issue.message}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+
+              {runStatus ? (
+                <div
+                  className={[
+                    "inline-flex max-w-[min(100%,34rem)] items-start gap-3 self-start rounded-2xl border px-4 py-3 backdrop-blur-sm",
+                    runStatus.tone === "error"
+                      ? "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]"
+                      : "border-emerald-400/30 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]",
+                  ].join(" ")}
+                  role={runStatus.tone === "error" ? "alert" : undefined}
+                  aria-live={runStatus.tone === "error" ? "assertive" : "polite"}
+                >
+                  <span
+                    className={[
+                      "mt-1 h-2 w-2 shrink-0 rounded-full",
+                      runStatus.tone === "error"
+                        ? "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.75)]"
+                        : "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.75)]",
+                    ].join(" ")}
+                    aria-hidden="true"
+                  />
+                  <div className="space-y-1">
+                    <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
+                      {runStatus.tone === "error" ? "Backtest Error" : "Backtest Status"}
+                    </p>
+                    <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">
+                      {runStatus.message}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
 
