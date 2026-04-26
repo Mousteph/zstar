@@ -6,12 +6,16 @@ from zstar.core.exceptions import StrategyExecutionError, StrategyValidationErro
 
 
 VALID_STRATEGY_CODE = """
+from zstar.core.strategy import CoreStrategy
+
 class MyStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):
         return 1.0
 """
 
 MULTI_STRATEGY_CODE = """
+from zstar.core.strategy import CoreStrategy
+
 class FirstStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):
         return 1.0
@@ -23,6 +27,8 @@ class SecondStrategy(CoreStrategy):
 
 
 REQUIRES_ARGS_STRATEGY_CODE = """
+from zstar.core.strategy import CoreStrategy
+
 class ParamStrategy(CoreStrategy):
     def __init__(self, risk_pct):
         super().__init__()
@@ -55,6 +61,8 @@ def test_load_strategy_from_code_single_error_message_is_plain_string():
 
 
 MULTI_ERROR_STRATEGY_CODE = """
+from zstar.core.strategy import CoreStrategy
+
 class BadSignalStrategy(CoreStrategy):
     def long_entry_signals(self, data):
         return data

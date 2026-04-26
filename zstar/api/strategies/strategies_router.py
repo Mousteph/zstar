@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 def list_strategy_files() -> StrategiesListResponse:
     strategy_files = list_strategy_filenames()
     logger.info("Listed strategies count=%s", len(strategy_files))
+
     return StrategiesListResponse(strategies=strategy_files)
 
 
@@ -29,6 +30,7 @@ def validate_strategy_file(request: ValidateStrategiesRequest) -> ValidateStrate
         strategy_path = resolve_strategy_file(request.strategy_filename)
         validator = ValidateStrategy(strategy_path=strategy_path)
         _, validation_result = validator.validate_file()
+
     except BacktestServiceError as exc:
         logger.info("Strategy validation request rejected error=%s", exc.error_code)
         raise HTTPException(status_code=exc.status_code, detail=f"{exc.error_code}:\n- {str(exc)}") from exc
@@ -47,7 +49,6 @@ def validate_strategy_file(request: ValidateStrategiesRequest) -> ValidateStrate
         summary_text=validation_result.summary_text,
         issues=[
             ValidationIssueResponse(
-                severity=issue.severity,
                 category=issue.category,
                 file=issue.file,
                 line=issue.line,

@@ -20,11 +20,9 @@ export interface BacktestRunStatus {
   message: string;
 }
 
-export type ValidationSeverity = "error";
 export type ValidationCategory = "syntax" | "template" | "type" | "logic";
 
 export interface ValidationIssue {
-  severity: ValidationSeverity;
   category: ValidationCategory;
   file: string;
   line: number | null;

@@ -148,7 +148,7 @@ export const DashboardPanel = memo(function DashboardPanel({
                     {validationResult.issues.map((issue, index) => (
                       <li key={`${issue.file}-${issue.line ?? "na"}-${issue.category}-${index}`}>
                         <p className="text-xs uppercase tracking-[0.16em] text-current/75">
-                          [{issue.severity}] [{issue.category}] {issue.file}
+                          [error] [{issue.category}] {issue.file}
                           {issue.line === null ? "" : `:${issue.line}`}
                         </p>
                         <p className="whitespace-pre-wrap font-mono text-xs leading-5 text-current sm:text-sm">

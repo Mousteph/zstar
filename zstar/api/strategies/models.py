@@ -14,7 +14,6 @@ class ValidateStrategiesRequest(BaseModel):
 
 
 class ValidationIssueResponse(BaseModel):
-    severity: Literal["error"]
     category: Literal["syntax", "template", "type", "logic"]
     file: str
     line: Optional[int] = None

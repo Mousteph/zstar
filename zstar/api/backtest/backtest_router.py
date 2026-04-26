@@ -144,7 +144,6 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
             error_lines = [
                 f"{issue.category}: {issue.message}" + (f" (line {issue.line})" if issue.line is not None else "")
                 for issue in validation_result.issues
-                if issue.severity == "error"
             ]
             raise StrategyValidationError(
                 "Strategy validation failed before backtest.\n- " + "\n- ".join(error_lines)

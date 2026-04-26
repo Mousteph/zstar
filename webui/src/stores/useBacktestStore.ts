@@ -47,7 +47,7 @@ function validationReportAsText(result: StrategyValidationResult): string {
 
   for (const issue of result.issues) {
     const location = issue.line === null ? issue.file : `${issue.file}:${issue.line}`;
-    lines.push(`- [${issue.severity}] [${issue.category}] ${location} - ${issue.message}`);
+    lines.push(`- [error] [${issue.category}] ${location} - ${issue.message}`);
   }
 
   return lines.join("\n");

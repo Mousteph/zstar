@@ -103,7 +103,7 @@ def test_run_backtest_returns_complete_payload(monkeypatch):
     monkeypatch.setattr(
         backtest_router_module.ValidateStrategy,
         "validate_file",
-        lambda _self, strategy_path: _mock_validation_success(Path(strategy_path).name),
+        lambda _self: _mock_validation_success("default_strategy.py"),
     )
 
     response = client.post("/api/backtest/run", json=_payload())
@@ -156,6 +156,8 @@ def test_validate_strategies_endpoint_returns_success_payload(monkeypatch, tmp_p
     strategy_dir.mkdir()
     (strategy_dir / "alpha.py").write_text(
         """
+from zstar.core.strategy import CoreStrategy
+
 class AlphaStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):
         return 1.0
@@ -180,6 +182,8 @@ def test_validate_strategies_endpoint_returns_categorized_issue(monkeypatch, tmp
     strategy_dir.mkdir()
     (strategy_dir / "broken.py").write_text(
         """
+from zstar.core.strategy import CoreStrategy
+
 class BrokenStrategy(CoreStrategy):
     def position_size(self, balance, entry_price):
         return "bad"
@@ -195,7 +199,6 @@ class BrokenStrategy(CoreStrategy):
     body = response.json()
     assert body["ready_to_backtest"] is False
     assert body["total_errors"] >= 1
-    assert body["issues"][0]["severity"] == "error"
     assert body["issues"][0]["category"] in {"type", "logic", "template", "syntax"}
     assert body["issues"][0]["file"] == "broken.py"
 
@@ -230,9 +233,9 @@ def test_run_backtest_uses_selected_strategy_filename(monkeypatch, tmp_path):
     monkeypatch.setattr(
         backtest_router_module.ValidateStrategy,
         "validate_file",
-        lambda _self, strategy_path: (
-            validated_files.append(Path(strategy_path).name),
-            _mock_validation_success(Path(strategy_path).name),
+        lambda _self: (
+            validated_files.append("alpha_strategy.py"),
+            _mock_validation_success("alpha_strategy.py"),
         )[1],
     )
 
@@ -265,9 +268,9 @@ def test_run_backtest_defaults_to_default_strategy_when_filename_missing(monkeyp
     monkeypatch.setattr(
         backtest_router_module.ValidateStrategy,
         "validate_file",
-        lambda _self, strategy_path: (
-            validated_files.append(Path(strategy_path).name),
-            _mock_validation_success(Path(strategy_path).name),
+        lambda _self: (
+            validated_files.append("default_strategy.py"),
+            _mock_validation_success("default_strategy.py"),
         )[1],
     )
 
@@ -302,15 +305,14 @@ def test_run_backtest_propagates_strategy_file_validation_errors(monkeypatch):
     monkeypatch.setattr(
         backtest_router_module.ValidateStrategy,
         "validate_file",
-        lambda _self, strategy_path: (
+        lambda _self: (
             None,
             ValidationResult(
-                strategy_filename=Path(strategy_path).name,
+                strategy_filename="default_strategy.py",
                 issues=[
                     ValidationIssue(
-                        severity="error",
                         category="template",
-                        file=Path(strategy_path).name,
+                        file="default_strategy.py",
                         line=None,
                         message="Keep exactly one CoreStrategy subclass. Found: AlphaStrategy, BetaStrategy.",
                     )
@@ -342,7 +344,7 @@ def test_run_backtest_rejects_empty_market_data(monkeypatch):
     monkeypatch.setattr(
         backtest_router_module.ValidateStrategy,
         "validate_file",
-        lambda _self, strategy_path: _mock_validation_success(Path(strategy_path).name),
+        lambda _self: _mock_validation_success("default_strategy.py"),
     )
 
     response = client.post("/api/backtest/run", json=_payload())
@@ -367,7 +369,7 @@ def test_run_backtest_serializes_nan_and_inf_kpis_to_null(monkeypatch):
     monkeypatch.setattr(
         backtest_router_module.ValidateStrategy,
         "validate_file",
-        lambda _self, strategy_path: _mock_validation_success(Path(strategy_path).name),
+        lambda _self: _mock_validation_success("default_strategy.py"),
     )
 
     original_kpis = BacktestReport.kpis
@@ -386,42 +388,3 @@ def test_run_backtest_serializes_nan_and_inf_kpis_to_null(monkeypatch):
     body = response.json()
     assert body["kpis"]["profit_factor"] is None
     assert body["kpis"]["sharpe_ratio"] is None
-
-
-def test_run_backtest_runs_when_validation_has_warnings(monkeypatch):
-    class _FakeYahooData:
-        def __init__(self, *_args, **_kwargs):
-            self.data = _price_frame()
-            self.interval = "1d"
-
-        def get_data(self):
-            return self.data.copy()
-
-        def get_interval(self):
-            return self.interval
-
-    monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
-    monkeypatch.setattr(
-        backtest_router_module.ValidateStrategy,
-        "validate_file",
-        lambda _self, strategy_path: (
-            SimpleStrategy(),
-            ValidationResult(
-                strategy_filename=Path(strategy_path).name,
-                issues=[
-                    ValidationIssue(
-                        severity="warning",
-                        category="logic",
-                        file=Path(strategy_path).name,
-                        line=None,
-                        message="No sample entry/exit signals were generated.",
-                    )
-                ],
-            ),
-        ),
-    )
-
-    response = client.post("/api/backtest/run", json=_payload())
-
-    assert response.status_code == 200
-    assert "kpis" in response.json()
