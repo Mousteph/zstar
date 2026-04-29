@@ -42,7 +42,6 @@ export function BacktestWorkbench() {
     validationResult,
     setSettings,
     runValidation,
-    exportValidationReport,
     runCurrentBacktest,
   } = useBacktestStore();
 
@@ -93,7 +92,6 @@ export function BacktestWorkbench() {
       selectedStrategy={selectedStrategy}
       settings={settings}
       themeMode={themeMode}
-      onExportValidationReport={exportValidationReport}
     />
   );
 

@@ -18,39 +18,7 @@ interface BacktestState {
   validationResult: StrategyValidationResult | null;
   setSettings: (settings: BacktestSettings) => void;
   runValidation: (strategyFilename?: string) => Promise<StrategyValidationResult | null>;
-  exportValidationReport: (format: "txt" | "json") => void;
   runCurrentBacktest: (strategyFilename?: string) => Promise<void>;
-}
-
-function downloadValidationReport(content: string, filename: string, mimeType: string): void {
-  if (globalThis.window === undefined) {
-    return;
-  }
-
-  const blob = new Blob([content], { type: mimeType });
-  const url = globalThis.window.URL.createObjectURL(blob);
-  const anchor = globalThis.window.document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  globalThis.window.URL.revokeObjectURL(url);
-}
-
-function validationReportAsText(result: StrategyValidationResult): string {
-  const lines: string[] = [
-    `strategy_filename: ${result.strategy_filename}`,
-    `ready_to_backtest: ${result.ready_to_backtest}`,
-    `total_errors: ${result.total_errors}`,
-    `summary_text: ${result.summary_text}`,
-    "issues:",
-  ];
-
-  for (const issue of result.issues) {
-    const location = issue.line === null ? issue.file : `${issue.file}:${issue.line}`;
-    lines.push(`- [error] [${issue.category}] ${location} - ${issue.message}`);
-  }
-
-  return lines.join("\n");
 }
 
 export const useBacktestStore = create<BacktestState>((set, get) => ({
@@ -65,7 +33,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
       settings,
     }),
   runValidation: async (strategyFilename) => {
-    set({ isValidating: true });
+    set({ isValidating: true, runStatus: null });
 
     try {
       const validationResult = await checkStrategyCode(
@@ -79,6 +47,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
       return validationResult;
     } catch (error) {
       set({
+        validationResult: null,
         runStatus: {
           tone: "error",
           message: error instanceof Error ? error.message : "Strategy validation failed.",
@@ -88,27 +57,6 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
     } finally {
       set({ isValidating: false });
     }
-  },
-  exportValidationReport: (format) => {
-    const validationResult = get().validationResult;
-    if (!validationResult) {
-      return;
-    }
-
-    if (format === "json") {
-      downloadValidationReport(
-        JSON.stringify(validationResult, null, 2),
-        `${validationResult.strategy_filename}.validation.json`,
-        "application/json"
-      );
-      return;
-    }
-
-    downloadValidationReport(
-      validationReportAsText(validationResult),
-      `${validationResult.strategy_filename}.validation.txt`,
-      "text/plain"
-    );
   },
   runCurrentBacktest: async (strategyFilename) => {
     const { settings } = get();
@@ -143,10 +91,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
         set({
           validationResult: response.strategy_validation,
           backtestResult: null,
-          runStatus: {
-            tone: "error",
-            message: "Backtest blocked: fix validation errors first.",
-          },
+          runStatus: null,
         });
         return;
       }
@@ -165,6 +110,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
       });
     } catch (error) {
       set({
+        validationResult: null,
         runStatus: {
           tone: "error",
           message: error instanceof Error ? error.message : "Backtest failed.",

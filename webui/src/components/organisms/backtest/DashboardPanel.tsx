@@ -31,7 +31,6 @@ interface DashboardPanelProps {
   readonly selectedStrategy: string;
   readonly settings: BacktestSettings;
   readonly themeMode: ThemeMode;
-  readonly onExportValidationReport: (format: "txt" | "json") => void;
 }
 
 function formatHeroDate(dateValue: string): string {
@@ -60,21 +59,74 @@ export const DashboardPanel = memo(function DashboardPanel({
   selectedStrategy,
   settings,
   themeMode,
-  onExportValidationReport,
 }: Readonly<DashboardPanelProps>) {
   const symbol = settings.symbol.trim().toUpperCase() || "—";
   const interval = settings.interval.trim() || "—";
   const startDate = formatHeroDate(settings.startDate);
   const endDate = formatHeroDate(settings.endDate);
 
-  let validationMessage = "Run Check Code to validate strategy file.";
-  if (isValidating) {
-    validationMessage = "Checking strategy code...";
-  } else if (validationResult) {
-    validationMessage = validationResult.ready_to_backtest
-      ? "Ready to backtest"
-      : validationResult.summary_text;
-  }
+  const firstValidationIssue =
+    validationResult && !validationResult.ready_to_backtest && validationResult.issues.length > 0
+      ? validationResult.issues[0]
+      : null;
+
+  const heroState = (() => {
+    if (firstValidationIssue) {
+      return {
+        tone: "error" as const,
+        title: "Strategy Validation Error",
+        message: firstValidationIssue.message,
+        meta: "[error] [" + firstValidationIssue.category + "] " + firstValidationIssue.file + (firstValidationIssue.line === null ? "" : ":" + firstValidationIssue.line),
+      };
+    }
+
+    if (isValidating) {
+      return {
+        tone: "ready" as const,
+        title: "Strategy Validation",
+        message: "Checking strategy code...",
+        meta: null,
+      };
+    }
+
+    if (runStatus?.tone === "success") {
+      return {
+        tone: "success" as const,
+        title: "Backtest Status",
+        message: runStatus.message,
+        meta: null,
+      };
+    }
+
+    if (runStatus?.tone === "error") {
+      return {
+        tone: "error" as const,
+        title: "Backtest Error",
+        message: runStatus.message,
+        meta: null,
+      };
+    }
+
+    if (validationResult?.ready_to_backtest) {
+      return {
+        tone: "ready" as const,
+        title: "Strategy Validation",
+        message: "Ready to backtest",
+        meta: null,
+      };
+    }
+
+    return null;
+  })();
+
+  const getHeroStateClass = (state: typeof heroState): string => {
+    if (!state) return "";
+    if (state.tone === "error") return "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]";
+    if (state.tone === "success") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]";
+    return "border-blue-500/30 bg-blue-500/10 text-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]";
+  };
+
+  const heroStateClass = getHeroStateClass(heroState);
 
   return (
     <div className="dashboard-panel-surface relative isolate h-full min-h-0 overflow-x-hidden overflow-y-auto px-5 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-7 lg:px-10">
@@ -102,98 +154,26 @@ export const DashboardPanel = memo(function DashboardPanel({
             <p className="hero-line-animation-delay-2 mt-1 text-sm tracking-wide text-muted-foreground sm:text-base">
               {startDate} - {endDate}
             </p>
-            <div className="status-line-animation mt-5 w-full space-y-3">
+            {heroState ? (
               <div
                 className={[
-                  "w-full rounded-2xl border px-4 py-3 backdrop-blur-sm",
-                  validationResult?.ready_to_backtest
-                    ? "border-blue-500/30 bg-blue-500/10 text-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]"
-                    : "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]",
+                  "status-line-animation mt-5 w-full rounded-2xl border px-4 py-3 backdrop-blur-sm",
+                  heroStateClass,
                 ].join(" ")}
-                role={validationResult && !validationResult.ready_to_backtest ? "alert" : undefined}
-                aria-live={validationResult && !validationResult.ready_to_backtest ? "assertive" : "polite"}
+                role={heroState.tone === "error" ? "alert" : undefined}
+                aria-live={heroState.tone === "error" ? "assertive" : "polite"}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
-                      Strategy Validation
-                    </p>
-                    <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">
-                      {validationMessage}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="rounded-md border border-current/30 px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() => {
-                        onExportValidationReport("txt");
-                      }}
-                      disabled={!validationResult}
-                    >
-                      Export TXT
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-md border border-current/30 px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() => {
-                        onExportValidationReport("json");
-                      }}
-                      disabled={!validationResult}
-                    >
-                      Export JSON
-                    </button>
-                  </div>
-                </div>
-
-                {validationResult && validationResult.issues.length > 0 ? (
-                  <ul className="mt-3 space-y-2 border-t border-current/20 pt-3">
-                    {validationResult.issues.map((issue, index) => (
-                      <li key={`${issue.file}-${issue.line ?? "na"}-${issue.category}-${index}`}>
-                        <p className="text-xs uppercase tracking-[0.16em] text-current/75">
-                          [error] [{issue.category}] {issue.file}
-                          {issue.line === null ? "" : `:${issue.line}`}
-                        </p>
-                        <p className="whitespace-pre-wrap font-mono text-xs leading-5 text-current sm:text-sm">
-                          {issue.message}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
+                  {heroState.title}
+                </p>
+                {heroState.meta ? (
+                  <p className="mt-2 text-xs uppercase tracking-[0.16em] text-current/75">{heroState.meta}</p>
                 ) : null}
+                <p className="mt-2 whitespace-pre-wrap font-mono text-xs leading-5 text-current sm:text-sm">
+                  {heroState.message}
+                </p>
               </div>
-
-              {runStatus ? (
-                <div
-                  className={[
-                    "inline-flex max-w-[min(100%,34rem)] items-start gap-3 self-start rounded-2xl border px-4 py-3 backdrop-blur-sm",
-                    runStatus.tone === "error"
-                      ? "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]"
-                      : "border-emerald-400/30 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]",
-                  ].join(" ")}
-                  role={runStatus.tone === "error" ? "alert" : undefined}
-                  aria-live={runStatus.tone === "error" ? "assertive" : "polite"}
-                >
-                  <span
-                    className={[
-                      "mt-1 h-2 w-2 shrink-0 rounded-full",
-                      runStatus.tone === "error"
-                        ? "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.75)]"
-                        : "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.75)]",
-                    ].join(" ")}
-                    aria-hidden="true"
-                  />
-                  <div className="space-y-1">
-                    <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
-                      {runStatus.tone === "error" ? "Backtest Error" : "Backtest Status"}
-                    </p>
-                    <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">
-                      {runStatus.message}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+            ) : null}
           </div>
         </section>
 
