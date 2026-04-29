@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict
 
 from zstar.core.backtest import BacktestConfigModel
 from zstar.core.data_loader import DataLoaderConfigModel
+from zstar.api.strategies.models import ValidateStrategiesResponse
 
 
 class BacktestRunRequest(BaseModel):
@@ -57,3 +58,8 @@ class BacktestRunResponse(BaseModel):
     trades: List[TradeResponse]
     kpis: Dict[str, Optional[float | str]]
     meta: BacktestMetaResponse
+
+
+class BacktestRunEnvelopeResponse(BaseModel):
+    strategy_validation: Optional[ValidateStrategiesResponse] = None
+    backtest_result: Optional[BacktestRunResponse] = None

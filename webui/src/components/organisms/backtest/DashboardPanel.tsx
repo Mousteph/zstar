@@ -67,6 +67,15 @@ export const DashboardPanel = memo(function DashboardPanel({
   const startDate = formatHeroDate(settings.startDate);
   const endDate = formatHeroDate(settings.endDate);
 
+  let validationMessage = "Run Check Code to validate strategy file.";
+  if (isValidating) {
+    validationMessage = "Checking strategy code...";
+  } else if (validationResult) {
+    validationMessage = validationResult.ready_to_backtest
+      ? "Ready to backtest"
+      : validationResult.summary_text;
+  }
+
   return (
     <div className="dashboard-panel-surface relative isolate h-full min-h-0 overflow-x-hidden overflow-y-auto px-5 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-7 lg:px-10">
       <div className="pointer-events-none absolute inset-0">
@@ -79,7 +88,7 @@ export const DashboardPanel = memo(function DashboardPanel({
         <section className="relative overflow-hidden border-b border-border/80 px-2 pb-9 pt-8 sm:px-4 sm:pb-11 sm:pt-10 lg:px-6 lg:pb-12 lg:pt-12">
           <div className="relative flex min-h-[34svh] flex-col justify-center lg:min-h-[44svh]">
             <p className="hero-line-animation text-[0.7rem] uppercase tracking-[0.24em] text-muted-foreground">
-              Backtest Snapshot
+              Backtest Snapshot{' '}
               <span className="ml-2 inline-block normal-case tracking-[0.08em] text-foreground/80">
                 {selectedStrategy}
               </span>
@@ -110,13 +119,7 @@ export const DashboardPanel = memo(function DashboardPanel({
                       Strategy Validation
                     </p>
                     <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">
-                      {isValidating
-                        ? "Checking strategy code..."
-                        : validationResult
-                          ? validationResult.ready_to_backtest
-                            ? "Ready to backtest"
-                            : validationResult.summary_text
-                          : "Run Check Code to validate strategy file."}
+                      {validationMessage}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

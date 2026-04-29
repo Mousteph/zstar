@@ -110,28 +110,29 @@ def test_run_backtest_returns_complete_payload(monkeypatch):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["meta"]["symbol"] == "AAPL"
-    assert body["meta"]["bars_count"] == 4
-    assert len(body["equity_curve"]) == 4
-    assert "datetime" in body["equity_curve"][0]
-    assert "+00:00" in body["equity_curve"][0]["datetime"]
-    assert "strategy" in body["equity_curve"][0]
-    assert "buy_and_hold" in body["equity_curve"][0]
-    assert len(body["market_ohlcv"]) == 4
-    assert "datetime" in body["market_ohlcv"][0]
-    assert "+00:00" in body["market_ohlcv"][0]["datetime"]
-    assert "open" in body["market_ohlcv"][0]
-    assert "high" in body["market_ohlcv"][0]
-    assert "low" in body["market_ohlcv"][0]
-    assert "close" in body["market_ohlcv"][0]
-    assert "volume" in body["market_ohlcv"][0]
-    assert len(body["trades"]) == 1
-    assert body["trades"][0]["symbol"] == "AAPL"
-    assert body["trades"][0]["side"] == "LONG"
-    assert "total_return_pct" in body["kpis"]
-    assert "sharpe_ratio" in body["kpis"]
-    assert "best_trade" in body["kpis"]
-    assert "worst_trade" in body["kpis"]
+    assert body["strategy_validation"] is None
+    assert body["backtest_result"]["meta"]["symbol"] == "AAPL"
+    assert body["backtest_result"]["meta"]["bars_count"] == 4
+    assert len(body["backtest_result"]["equity_curve"]) == 4
+    assert "datetime" in body["backtest_result"]["equity_curve"][0]
+    assert "+00:00" in body["backtest_result"]["equity_curve"][0]["datetime"]
+    assert "strategy" in body["backtest_result"]["equity_curve"][0]
+    assert "buy_and_hold" in body["backtest_result"]["equity_curve"][0]
+    assert len(body["backtest_result"]["market_ohlcv"]) == 4
+    assert "datetime" in body["backtest_result"]["market_ohlcv"][0]
+    assert "+00:00" in body["backtest_result"]["market_ohlcv"][0]["datetime"]
+    assert "open" in body["backtest_result"]["market_ohlcv"][0]
+    assert "high" in body["backtest_result"]["market_ohlcv"][0]
+    assert "low" in body["backtest_result"]["market_ohlcv"][0]
+    assert "close" in body["backtest_result"]["market_ohlcv"][0]
+    assert "volume" in body["backtest_result"]["market_ohlcv"][0]
+    assert len(body["backtest_result"]["trades"]) == 1
+    assert body["backtest_result"]["trades"][0]["symbol"] == "AAPL"
+    assert body["backtest_result"]["trades"][0]["side"] == "LONG"
+    assert "total_return_pct" in body["backtest_result"]["kpis"]
+    assert "sharpe_ratio" in body["backtest_result"]["kpis"]
+    assert "best_trade" in body["backtest_result"]["kpis"]
+    assert "worst_trade" in body["backtest_result"]["kpis"]
 
 
 def test_list_strategies_returns_python_filenames_without_extension(monkeypatch, tmp_path):
@@ -323,9 +324,12 @@ def test_run_backtest_propagates_strategy_file_validation_errors(monkeypatch):
 
     response = client.post("/api/backtest/run", json=_payload())
 
-    assert response.status_code == 400
-    assert "strategy_validation_error" in response.json()["detail"].lower()
-    assert "corestrategy subclass" in response.json()["detail"].lower()
+    assert response.status_code == 200
+    body = response.json()
+    assert body["backtest_result"] is None
+    assert body["strategy_validation"]["ready_to_backtest"] is False
+    assert body["strategy_validation"]["total_errors"] == 1
+    assert "corestrategy subclass" in body["strategy_validation"]["issues"][0]["message"].lower()
 
 
 def test_run_backtest_rejects_empty_market_data(monkeypatch):
@@ -386,5 +390,6 @@ def test_run_backtest_serializes_nan_and_inf_kpis_to_null(monkeypatch):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["kpis"]["profit_factor"] is None
-    assert body["kpis"]["sharpe_ratio"] is None
+    assert body["strategy_validation"] is None
+    assert body["backtest_result"]["kpis"]["profit_factor"] is None
+    assert body["backtest_result"]["kpis"]["sharpe_ratio"] is None

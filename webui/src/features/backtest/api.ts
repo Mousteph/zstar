@@ -1,12 +1,12 @@
 import type {
+  BacktestRunEnvelopeResponse,
   BacktestRunRequest,
-  BacktestRunResponse,
   StrategiesResponse,
   StrategyValidationResult,
   ValidateStrategyRequest,
 } from "@/types/backtest";
 
-export async function runBacktest(payload: BacktestRunRequest): Promise<BacktestRunResponse> {
+export async function runBacktest(payload: BacktestRunRequest): Promise<BacktestRunEnvelopeResponse> {
   const response = await fetch("/api/backtest/run", {
     method: "POST",
     headers: {
@@ -16,7 +16,7 @@ export async function runBacktest(payload: BacktestRunRequest): Promise<Backtest
   });
 
   const responseJson = (await response.json()) as
-    | BacktestRunResponse
+    | BacktestRunEnvelopeResponse
     | {
         detail?: string;
       };
@@ -29,7 +29,14 @@ export async function runBacktest(payload: BacktestRunRequest): Promise<Backtest
     throw new Error(detail);
   }
 
-  return responseJson as BacktestRunResponse;
+  if (
+    !("strategy_validation" in responseJson) ||
+    !("backtest_result" in responseJson)
+  ) {
+    throw new Error("Invalid run backtest response payload.");
+  }
+
+  return responseJson as BacktestRunEnvelopeResponse;
 }
 
 export async function fetchStrategies(): Promise<string[]> {

@@ -23,17 +23,17 @@ interface BacktestState {
 }
 
 function downloadValidationReport(content: string, filename: string, mimeType: string): void {
-  if (typeof window === "undefined") {
+  if (globalThis.window === undefined) {
     return;
   }
 
   const blob = new Blob([content], { type: mimeType });
-  const url = window.URL.createObjectURL(blob);
-  const anchor = window.document.createElement("a");
+  const url = globalThis.window.URL.createObjectURL(blob);
+  const anchor = globalThis.window.document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  window.URL.revokeObjectURL(url);
+  globalThis.window.URL.revokeObjectURL(url);
 }
 
 function validationReportAsText(result: StrategyValidationResult): string {
@@ -111,25 +111,8 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
     );
   },
   runCurrentBacktest: async (strategyFilename) => {
-    const { settings, runValidation } = get();
+    const { settings } = get();
     set({ isRunning: true, runStatus: null });
-
-    const validationResult = await runValidation(strategyFilename);
-    if (!validationResult) {
-      set({ isRunning: false });
-      return;
-    }
-
-    if (!validationResult.ready_to_backtest) {
-      set({
-        runStatus: {
-          tone: "error",
-          message: "Backtest blocked: fix validation errors first.",
-        },
-        isRunning: false,
-      });
-      return;
-    }
 
     const slippageSeed = settings.slippageSeed.trim();
     const parsedSlippageSeed = slippageSeed ? Number(slippageSeed) : undefined;
@@ -139,7 +122,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
         : undefined;
 
     try {
-      const result = await runBacktest({
+      const response = await runBacktest({
         data: {
           symbol: settings.symbol,
           start_date: settings.startDate,
@@ -156,8 +139,25 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
         },
       });
 
+      if (response.strategy_validation) {
+        set({
+          validationResult: response.strategy_validation,
+          backtestResult: null,
+          runStatus: {
+            tone: "error",
+            message: "Backtest blocked: fix validation errors first.",
+          },
+        });
+        return;
+      }
+
+      if (!response.backtest_result) {
+        throw new Error("Backtest response missing result payload.");
+      }
+
       set({
-        backtestResult: result,
+        validationResult: null,
+        backtestResult: response.backtest_result,
         runStatus: {
           tone: "success",
           message: "Backtest completed successfully.",

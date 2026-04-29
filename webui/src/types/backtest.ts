@@ -118,6 +118,11 @@ export interface BacktestRunResponse {
   meta: BacktestMeta;
 }
 
+export interface BacktestRunEnvelopeResponse {
+  strategy_validation: StrategyValidationResult | null;
+  backtest_result: BacktestRunResponse | null;
+}
+
 export interface StrategiesResponse {
   strategies: string[];
 }

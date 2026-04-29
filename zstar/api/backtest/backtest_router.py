@@ -12,9 +12,11 @@ from zstar.core.data_loader import YahooData
 from zstar.core.strategy import ValidateStrategy
 from zstar.core.exceptions import BacktestServiceError, StrategyValidationError
 from zstar.api.utils import resolve_strategy_file
+from zstar.api.strategies.models import ValidateStrategiesResponse, ValidationIssueResponse
 from zstar.logger import get_logger
 
 from .models import (
+    BacktestRunEnvelopeResponse,
     BacktestMetaResponse,
     BacktestRunRequest,
     BacktestRunResponse,
@@ -127,7 +129,7 @@ def _serialize_market_ohlcv(report: BacktestReport) -> List[MarketOhlcvPointResp
 
 
 @router.post("/run", responses=responses)
-def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
+def run_backtest(request: BacktestRunRequest) -> BacktestRunEnvelopeResponse:
     logger.info(
         "Backtest requested symbol=%s interval=%s start_date=%s end_date=%s",
         request.data.symbol,
@@ -141,12 +143,23 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
         validator = ValidateStrategy(strategy_path=strategy_path)
         strategy, validation_result = validator.validate_file()
         if validation_result.total_errors > 0:
-            error_lines = [
-                f"{issue.category}: {issue.message}" + (f" (line {issue.line})" if issue.line is not None else "")
-                for issue in validation_result.issues
-            ]
-            raise StrategyValidationError(
-                "Strategy validation failed before backtest.\n- " + "\n- ".join(error_lines)
+            return BacktestRunEnvelopeResponse(
+                strategy_validation=ValidateStrategiesResponse(
+                    strategy_filename=validation_result.strategy_filename,
+                    ready_to_backtest=validation_result.ready_to_backtest,
+                    total_errors=validation_result.total_errors,
+                    summary_text=validation_result.summary_text,
+                    issues=[
+                        ValidationIssueResponse(
+                            category=issue.category,
+                            file=issue.file,
+                            line=issue.line,
+                            message=issue.message,
+                        )
+                        for issue in validation_result.issues
+                    ],
+                ),
+                backtest_result=None,
             )
         if strategy is None:
             raise StrategyValidationError("Strategy could not be instantiated after validation.")
@@ -169,16 +182,19 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunResponse:
         logger.exception("Backtest failed with internal error")
         raise HTTPException(status_code=500, detail=f"INTERNAL_SERVER_ERROR: {str(exc)}") from exc
 
-    return BacktestRunResponse(
-        equity_curve=_serialize_equity_curve(report),
-        market_ohlcv=_serialize_market_ohlcv(report),
-        trades=_serialize_trades(report.trades, symbol=request.data.symbol),
-        kpis=_serialize_kpis(report),
-        meta=BacktestMetaResponse(
-            symbol=request.data.symbol,
-            start_date=request.data.start_date,
-            end_date=request.data.end_date,
-            interval=request.data.interval,
-            bars_count=len(data),
+    return BacktestRunEnvelopeResponse(
+        strategy_validation=None,
+        backtest_result=BacktestRunResponse(
+            equity_curve=_serialize_equity_curve(report),
+            market_ohlcv=_serialize_market_ohlcv(report),
+            trades=_serialize_trades(report.trades, symbol=request.data.symbol),
+            kpis=_serialize_kpis(report),
+            meta=BacktestMetaResponse(
+                symbol=request.data.symbol,
+                start_date=request.data.start_date,
+                end_date=request.data.end_date,
+                interval=request.data.interval,
+                bars_count=len(data),
+            ),
         ),
     )
