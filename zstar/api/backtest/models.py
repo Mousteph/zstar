@@ -1,10 +1,9 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from zstar.core.backtest import BacktestConfigModel
 from zstar.core.data_loader import DataLoaderConfigModel
-from zstar.api.strategies.models import ValidateStrategiesResponse
 
 
 class BacktestRunRequest(BaseModel):
@@ -63,3 +62,26 @@ class BacktestRunResponse(BaseModel):
 class BacktestRunEnvelopeResponse(BaseModel):
     strategy_validation: Optional[ValidateStrategiesResponse] = None
     backtest_result: Optional[BacktestRunResponse] = None
+
+
+class StrategiesListResponse(BaseModel):
+    strategies: list[str]
+
+
+class ValidateStrategiesRequest(BaseModel):
+    strategy_filename: Optional[str] = None
+
+
+class ValidationIssueResponse(BaseModel):
+    category: Literal["syntax", "template", "type", "logic"]
+    file: str
+    line: Optional[int] = None
+    message: str
+
+
+class ValidateStrategiesResponse(BaseModel):
+    strategy_filename: str
+    ready_to_backtest: bool
+    total_errors: int
+    issues: list[ValidationIssueResponse]
+    summary_text: str

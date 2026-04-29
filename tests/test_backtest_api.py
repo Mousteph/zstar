@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from zstar.core.backtest.backtest_report import BacktestReport
 from zstar.core.strategy import CoreStrategy
 from zstar.core.strategy.validate_strategy import ValidationIssue, ValidationResult
+from zstar.api.backtest.strategy_models import ValidateStrategiesResponse, ValidationIssueResponse
 from zstar.api.start_backend import app
 
 backtest_router_module = importlib.import_module("zstar.api.backtest.backtest_router")
@@ -101,9 +102,9 @@ def test_run_backtest_returns_complete_payload(monkeypatch):
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
     monkeypatch.setattr(
-        backtest_router_module.ValidateStrategy,
-        "validate_file",
-        lambda _self: _mock_validation_success("default_strategy.py"),
+        backtest_router_module,
+        "resolve_strategy_validation",
+        lambda _strategy_filename: type("Payload", (), {"strategy": SimpleStrategy(), "validation": type("Validation", (), {"ready_to_backtest": True, "strategy_filename": "default_strategy.py", "total_errors": 0, "summary_text": "Ready to backtest", "issues": []})()})(),
     )
 
     response = client.post("/api/backtest/run", json=_payload())
@@ -232,11 +233,11 @@ def test_run_backtest_uses_selected_strategy_filename(monkeypatch, tmp_path):
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
     monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
     monkeypatch.setattr(
-        backtest_router_module.ValidateStrategy,
-        "validate_file",
-        lambda _self: (
+        backtest_router_module,
+        "resolve_strategy_validation",
+        lambda _strategy_filename: (
             validated_files.append("alpha_strategy.py"),
-            _mock_validation_success("alpha_strategy.py"),
+            type("Payload", (), {"strategy": SimpleStrategy(), "validation": type("Validation", (), {"ready_to_backtest": True, "strategy_filename": "alpha_strategy.py", "total_errors": 0, "summary_text": "Ready to backtest", "issues": []})()})(),
         )[1],
     )
 
@@ -267,11 +268,11 @@ def test_run_backtest_defaults_to_default_strategy_when_filename_missing(monkeyp
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
     monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
     monkeypatch.setattr(
-        backtest_router_module.ValidateStrategy,
-        "validate_file",
-        lambda _self: (
+        backtest_router_module,
+        "resolve_strategy_validation",
+        lambda _strategy_filename: (
             validated_files.append("default_strategy.py"),
-            _mock_validation_success("default_strategy.py"),
+            type("Payload", (), {"strategy": SimpleStrategy(), "validation": type("Validation", (), {"ready_to_backtest": True, "strategy_filename": "default_strategy.py", "total_errors": 0, "summary_text": "Ready to backtest", "issues": []})()})(),
         )[1],
     )
 
@@ -304,22 +305,9 @@ def test_run_backtest_propagates_strategy_file_validation_errors(monkeypatch):
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
     monkeypatch.setattr(
-        backtest_router_module.ValidateStrategy,
-        "validate_file",
-        lambda _self: (
-            None,
-            ValidationResult(
-                strategy_filename="default_strategy.py",
-                issues=[
-                    ValidationIssue(
-                        category="template",
-                        file="default_strategy.py",
-                        line=None,
-                        message="Keep exactly one CoreStrategy subclass. Found: AlphaStrategy, BetaStrategy.",
-                    )
-                ],
-            ),
-        ),
+        backtest_router_module,
+        "resolve_strategy_validation",
+        lambda _strategy_filename: type("Payload", (), {"strategy": None, "validation": ValidateStrategiesResponse(ready_to_backtest=False, strategy_filename="default_strategy.py", total_errors=1, summary_text="Validation completed with 1 error(s)", issues=[ValidationIssueResponse(category="template", file="default_strategy.py", line=None, message="Keep exactly one CoreStrategy subclass. Found: AlphaStrategy, BetaStrategy.")])})(),
     )
 
     response = client.post("/api/backtest/run", json=_payload())
@@ -346,9 +334,9 @@ def test_run_backtest_rejects_empty_market_data(monkeypatch):
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
     monkeypatch.setattr(
-        backtest_router_module.ValidateStrategy,
-        "validate_file",
-        lambda _self: _mock_validation_success("default_strategy.py"),
+        backtest_router_module,
+        "resolve_strategy_validation",
+        lambda _strategy_filename: type("Payload", (), {"strategy": SimpleStrategy(), "validation": type("Validation", (), {"ready_to_backtest": True, "strategy_filename": "default_strategy.py", "total_errors": 0, "summary_text": "Ready to backtest", "issues": []})()})(),
     )
 
     response = client.post("/api/backtest/run", json=_payload())
@@ -371,9 +359,9 @@ def test_run_backtest_serializes_nan_and_inf_kpis_to_null(monkeypatch):
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
     monkeypatch.setattr(
-        backtest_router_module.ValidateStrategy,
-        "validate_file",
-        lambda _self: _mock_validation_success("default_strategy.py"),
+        backtest_router_module,
+        "resolve_strategy_validation",
+        lambda _strategy_filename: type("Payload", (), {"strategy": SimpleStrategy(), "validation": type("Validation", (), {"ready_to_backtest": True, "strategy_filename": "default_strategy.py", "total_errors": 0, "summary_text": "Ready to backtest", "issues": []})()})(),
     )
 
     original_kpis = BacktestReport.kpis
