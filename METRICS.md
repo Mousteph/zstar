@@ -2,7 +2,7 @@
 
 ## Overview
 
-ZStar reports strategy, trade, and buy-and-hold metrics from a completed backtest. Strategy equity is reconstructed by starting with `initial_balance` and applying each closed trade's `net_pnl` at its exit timestamp. Buy-and-hold equity assumes the full initial balance is invested at the first valid close and held through the final close.
+ZStar reports strategy, trade, and buy-and-hold metrics from a completed backtest. Strategy equity is reconstructed by starting with `initial_balance`, realizing each closed trade's `net_pnl` at its exit timestamp, and marking open trades to the current close price between entry and exit. Buy-and-hold equity assumes the full initial balance is invested at the very first bar's close and held through the final close; if that close is non-positive, no buy-and-hold curve is produced.
 
 All percentage return and drawdown values are expressed in percent points, not decimals. For example, `12.5` means 12.5%.
 
@@ -51,7 +51,7 @@ All percentage return and drawdown values are expressed in percent points, not d
 - **What It Means**: Number of closed trades included in the report.
 - **Formula**: $$N$$
 - **Implementation**: `_compute_total_trades()`.
-- **Interpretation**: Very low counts make win rate, expectancy, and Sharpe less statistically useful.
+- **Interpretation**: Very low counts make win rate, average trade PnL, and Sharpe less statistically useful.
 - **Example**: Ten closed trades gives `total_trades = 10`.
 - **Edge Cases**: Returns `0` when no trades close.
 
@@ -126,15 +126,6 @@ All percentage return and drawdown values are expressed in percent points, not d
 - **Interpretation**: Values above `1.0` are profitable before considering capital efficiency. `1.5` to `2.0` is generally healthy.
 - **Example**: Gross profit `$80` and gross loss `$20` gives `4.0`.
 - **Edge Cases**: Returns `inf` when there is profit and no loss. Returns `NaN` when both gross profit and gross loss are zero.
-
-### Expectancy
-
-- **What It Means**: Expected net PnL per trade.
-- **Formula**: $$\frac{1}{N}\sum_{i=1}^{N} pnl_i$$
-- **Implementation**: `_compute_expectancy(pnls)`.
-- **Interpretation**: Positive expectancy is required for long-run profitability.
-- **Example**: `[50, -20, 30]` gives expectancy `$20`.
-- **Edge Cases**: Returns `0.0` when there are no trades. It is currently equivalent to average trade PnL.
 
 ### Maximum Drawdown %
 
@@ -243,7 +234,6 @@ All percentage return and drawdown values are expressed in percent points, not d
 | Average Win | $$mean(pnl_i \mid pnl_i > 0)$$ | Larger than absolute average loss | `_compute_avg_win()` |
 | Average Loss | $$mean(pnl_i \mid pnl_i < 0)$$ | Less negative is better | `_compute_avg_loss()` |
 | Profit Factor | $$gross\_profit / gross\_loss$$ | `> 1.0` profitable, `> 1.5` healthy, `> 2.0` strong | `_compute_profit_factor()` |
-| Expectancy | $$mean(pnl_i)$$ | Positive | `_compute_expectancy()` |
 | Maximum Drawdown % | $$min(E_t / peak_t - 1) \times 100$$ | Closer to `0`; often above `-20%` for controlled risk | `_compute_max_drawdown_pct()` |
 | Sharpe Ratio | $$mean(r_t-r_f) / std(r_t) \times \sqrt{periods}$$ | `> 1` acceptable, `> 2` strong, `> 3` exceptional | `_compute_sharpe_ratio()` |
 | Best Trade | $$max(pnl_i)$$ | Positive, but not the only source of returns | `_compute_best_trade()` |
@@ -262,7 +252,8 @@ All percentage return and drawdown values are expressed in percent points, not d
 - `risk_free_rate` is an annual decimal return, such as `0.04` for 4%, and defaults to `0.0`.
 - Sharpe ratio annualization assumes 252 trading days per year and 390 trading minutes per regular trading day.
 - Supported interval suffixes for annualization are `d`, `h`, and `m`; unknown formats fall back to daily annualization.
-- Strategy equity changes only when trades close. Open trade mark-to-market movement is not represented in the strategy equity curve.
+- Strategy equity marks open trades to the current bar close between `entry_datetime` and `exit_datetime`.
+- Open-trade equity includes realized PnL from already closed trades, current raw unrealized PnL, and the open trade's entry fee. The exit fee is applied when the trade closes.
 - Buy-and-hold uses close prices and assumes all starting capital is invested at the first close.
 - Buy-and-hold does not include fees, slippage, dividends, borrow costs, funding, or cash interest.
 - Profit factor is `inf` for a profitable strategy with no losing trades and `NaN` when there is no profit and no loss.
@@ -279,6 +270,5 @@ All percentage return and drawdown values are expressed in percent points, not d
 - Comparing net PnL across backtests with different starting balances instead of comparing return percentages and risk.
 - Ignoring drawdown. A strategy can show strong total return while taking unacceptable interim losses.
 - Treating Sharpe ratio as reliable when there are few trades or mostly flat equity returns.
-- Forgetting that strategy equity is trade-close based, not mark-to-market.
+- Forgetting that strategy equity is marked to close prices while a trade is open, not to intrabar highs or lows.
 - Comparing strategy returns to buy-and-hold without checking whether the strategy used less capital or carried lower drawdown.
-- Interpreting average trade PnL and expectancy as separate signals in this implementation; they currently use the same formula.

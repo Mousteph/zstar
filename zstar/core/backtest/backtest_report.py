@@ -20,16 +20,42 @@ class BacktestReport:
         if self.data.empty:
             return pd.Series(dtype=float, name="strategy")
 
-        index = self.data.index
-        pnl_changes = np.zeros(len(index), dtype=float)
+        equity_values = [
+            self._compute_strategy_equity_at(timestamp, close_price)
+            for timestamp, close_price in self.data["close"].astype(float).items()
+        ]
+        return pd.Series(equity_values, index=self.data.index, name="strategy")
 
-        for trade in sorted(self.trades, key=lambda trade_item: trade_item.exit_datetime):
-            exit_idx = index.searchsorted(trade.exit_datetime, side="left")
-            if exit_idx < len(index):
-                pnl_changes[exit_idx] += float(trade.net_pnl)
 
-        equity = self.initial_balance + np.cumsum(pnl_changes)
-        return pd.Series(equity, index=index, name="strategy")
+    def _compute_strategy_equity_at(self, timestamp: pd.Timestamp, price: float) -> float:
+        """
+        Calculate strategy equity at one timestamp.
+
+        Formula: initial_balance + realized_pnl + open_unrealized_pnl - open_entry_fees
+
+        Edge cases:
+            - Closed trades are realized at and after exit_datetime.
+            - Open trades are marked to the current close price before exit_datetime.
+        """
+        realized = sum(trade.net_pnl for trade in self.trades if trade.exit_datetime <= timestamp)
+        open_pnl = sum(
+            self._compute_unrealized_trade_pnl(trade, price) - trade.entry_fee
+            for trade in self.trades
+            if trade.entry_datetime <= timestamp < trade.exit_datetime
+        )
+        return float(self.initial_balance + realized + open_pnl)
+
+
+    def _compute_unrealized_trade_pnl(self, trade: Trade, price: float) -> float:
+        """
+        Calculate mark-to-market raw PnL for an open trade.
+
+        Formula: (current_price - entry_price) * size * side_sign
+
+        Edge cases:
+            - Uses trade side sign, so short positions gain when price declines.
+        """
+        return float((price - trade.entry_price) * trade.size * trade.side.to_sign())
 
 
     def _compute_return_pct(self, final_value: float) -> float:
@@ -46,8 +72,7 @@ class BacktestReport:
         return ((final_value - self.initial_balance) / self.initial_balance) * 100
 
 
-    @staticmethod
-    def _compute_max_drawdown_pct(equity_curve: pd.Series) -> float:
+    def _compute_max_drawdown_pct(self, equity_curve: pd.Series) -> float:
         """
         Calculate maximum drawdown percentage.
 
@@ -250,6 +275,14 @@ class BacktestReport:
 
 
     def _compute_total_trades(self) -> int:
+        """
+        Count closed trades.
+
+        Formula: len(trades)
+
+        Edge cases:
+            - Returns 0 when no trades were closed.
+        """
         return len(self.trades)
 
 
@@ -355,19 +388,6 @@ class BacktestReport:
         return float(np.inf) if gross_profit > 0 else float(np.nan)
 
 
-    def _compute_expectancy(self, pnls: np.ndarray) -> float:
-        """
-        Calculate expected net PnL per trade.
-
-        Formula: mean(net_pnl_i)
-
-        Edge cases:
-            - Returns 0.0 when there are no trades.
-            - Currently equivalent to avg_trade_pnl by design.
-        """
-        return self._compute_avg_trade_pnl(pnls)
-
-
     def _compute_best_trade(self, pnls: np.ndarray) -> float:
         """
         Calculate best trade net PnL.
@@ -433,7 +453,6 @@ class BacktestReport:
             "avg_win": self._compute_avg_win(wins),
             "avg_loss": self._compute_avg_loss(losses),
             "profit_factor": self._compute_profit_factor(gross_profit, gross_loss),
-            "expectancy": self._compute_expectancy(pnls),
             "max_drawdown_pct": self._compute_max_drawdown_pct(strategy_curve),
             "sharpe_ratio": self._compute_sharpe_ratio(strategy_returns),
             "best_trade": self._compute_best_trade(pnls),

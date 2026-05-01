@@ -110,7 +110,6 @@ export function formatKpiValue(key: string, value: number | string | null): stri
     key.includes("fees") ||
     key.includes("profit") ||
     key.includes("loss") ||
-    key === "expectancy" ||
     key === "avg_win" ||
     key === "avg_loss" ||
     key === "best_trade" ||
