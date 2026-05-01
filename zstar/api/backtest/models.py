@@ -1,4 +1,6 @@
-from typing import Dict, List, Optional
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -57,3 +59,31 @@ class BacktestRunResponse(BaseModel):
     trades: List[TradeResponse]
     kpis: Dict[str, Optional[float | str]]
     meta: BacktestMetaResponse
+
+
+class BacktestRunEnvelopeResponse(BaseModel):
+    strategy_validation: Optional[ValidateStrategiesResponse] = None
+    backtest_result: Optional[BacktestRunResponse] = None
+
+
+class StrategiesListResponse(BaseModel):
+    strategies: list[str]
+
+
+class ValidateStrategiesRequest(BaseModel):
+    strategy_filename: Optional[str] = None
+
+
+class ValidationIssueResponse(BaseModel):
+    category: Literal["syntax", "template", "type", "logic"]
+    file: str
+    line: Optional[int] = None
+    message: str
+
+
+class ValidateStrategiesResponse(BaseModel):
+    strategy_filename: str
+    ready_to_backtest: bool
+    total_errors: int
+    issues: list[ValidationIssueResponse]
+    summary_text: str

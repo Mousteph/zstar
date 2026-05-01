@@ -1,27 +1,63 @@
 import { create } from "zustand";
 
-import { runBacktest } from "@/features/backtest/api";
+import { checkStrategyCode, runBacktest } from "@/features/backtest/api";
 import { defaultBacktestSettings } from "@/features/backtest/defaults";
-import type { BacktestRunResponse, BacktestRunStatus, BacktestSettings } from "@/types/backtest";
+import type {
+  BacktestRunResponse,
+  BacktestRunStatus,
+  BacktestSettings,
+  StrategyValidationResult,
+} from "@/types/backtest";
 
 interface BacktestState {
   isRunning: boolean;
+  isValidating: boolean;
   settings: BacktestSettings;
   backtestResult: BacktestRunResponse | null;
   runStatus: BacktestRunStatus | null;
+  validationResult: StrategyValidationResult | null;
   setSettings: (settings: BacktestSettings) => void;
+  runValidation: (strategyFilename?: string) => Promise<StrategyValidationResult | null>;
   runCurrentBacktest: (strategyFilename?: string) => Promise<void>;
 }
 
 export const useBacktestStore = create<BacktestState>((set, get) => ({
   isRunning: false,
+  isValidating: false,
   settings: defaultBacktestSettings,
   backtestResult: null,
   runStatus: null,
+  validationResult: null,
   setSettings: (settings) =>
     set({
       settings,
     }),
+  runValidation: async (strategyFilename) => {
+    set({ isValidating: true, runStatus: null });
+
+    try {
+      const validationResult = await checkStrategyCode(
+        strategyFilename ? { strategy_filename: strategyFilename } : {}
+      );
+
+      set({
+        validationResult,
+      });
+
+      return validationResult;
+    } catch (error) {
+      set({
+        validationResult: null,
+        runStatus: {
+          tone: "error",
+          message: error instanceof Error ? error.message : "Strategy validation failed.",
+        },
+      });
+      return null;
+    } finally {
+      set({ isValidating: false });
+    }
+  },
   runCurrentBacktest: async (strategyFilename) => {
     const { settings } = get();
     set({ isRunning: true, runStatus: null });
@@ -34,7 +70,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
         : undefined;
 
     try {
-      const result = await runBacktest({
+      const response = await runBacktest({
         data: {
           symbol: settings.symbol,
           start_date: settings.startDate,
@@ -51,8 +87,22 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
         },
       });
 
+      if (response.strategy_validation) {
+        set({
+          validationResult: response.strategy_validation,
+          backtestResult: null,
+          runStatus: null,
+        });
+        return;
+      }
+
+      if (!response.backtest_result) {
+        throw new Error("Backtest response missing result payload.");
+      }
+
       set({
-        backtestResult: result,
+        validationResult: null,
+        backtestResult: response.backtest_result,
         runStatus: {
           tone: "success",
           message: "Backtest completed successfully.",
@@ -60,6 +110,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
       });
     } catch (error) {
       set({
+        validationResult: null,
         runStatus: {
           tone: "error",
           message: error instanceof Error ? error.message : "Backtest failed.",

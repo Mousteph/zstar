@@ -1,6 +1,12 @@
-import type { BacktestRunRequest, BacktestRunResponse, StrategiesResponse } from "@/types/backtest";
+import type {
+  BacktestRunEnvelopeResponse,
+  BacktestRunRequest,
+  StrategiesResponse,
+  StrategyValidationResult,
+  ValidateStrategyRequest,
+} from "@/types/backtest";
 
-export async function runBacktest(payload: BacktestRunRequest): Promise<BacktestRunResponse> {
+export async function runBacktest(payload: BacktestRunRequest): Promise<BacktestRunEnvelopeResponse> {
   const response = await fetch("/api/backtest/run", {
     method: "POST",
     headers: {
@@ -10,7 +16,7 @@ export async function runBacktest(payload: BacktestRunRequest): Promise<Backtest
   });
 
   const responseJson = (await response.json()) as
-    | BacktestRunResponse
+    | BacktestRunEnvelopeResponse
     | {
         detail?: string;
       };
@@ -23,7 +29,14 @@ export async function runBacktest(payload: BacktestRunRequest): Promise<Backtest
     throw new Error(detail);
   }
 
-  return responseJson as BacktestRunResponse;
+  if (
+    !("strategy_validation" in responseJson) ||
+    !("backtest_result" in responseJson)
+  ) {
+    throw new Error("Invalid run backtest response payload.");
+  }
+
+  return responseJson as BacktestRunEnvelopeResponse;
 }
 
 export async function fetchStrategies(): Promise<string[]> {
@@ -50,4 +63,39 @@ export async function fetchStrategies(): Promise<string[]> {
   }
 
   return responseJson.strategies;
+}
+
+export async function checkStrategyCode(payload: ValidateStrategyRequest): Promise<StrategyValidationResult> {
+  const response = await fetch("/api/validate-strategies", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseJson = (await response.json()) as
+    | StrategyValidationResult
+    | {
+        detail?: string;
+      };
+
+  if (!response.ok) {
+    const detail =
+      "detail" in responseJson && typeof responseJson.detail === "string"
+        ? responseJson.detail
+        : "Unable to validate strategy.";
+    throw new Error(detail);
+  }
+
+  if (
+    !("issues" in responseJson) ||
+    !Array.isArray(responseJson.issues) ||
+    !("ready_to_backtest" in responseJson) ||
+    typeof responseJson.ready_to_backtest !== "boolean"
+  ) {
+    throw new Error("Invalid strategy validation response payload.");
+  }
+
+  return responseJson as StrategyValidationResult;
 }

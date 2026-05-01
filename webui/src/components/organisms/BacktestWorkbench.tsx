@@ -33,8 +33,17 @@ export function BacktestWorkbench() {
     toggleThemeMode,
   } = useUIStore();
 
-  const { isRunning, settings, backtestResult, runStatus, setSettings, runCurrentBacktest } =
-    useBacktestStore();
+  const {
+    isRunning,
+    isValidating,
+    settings,
+    backtestResult,
+    runStatus,
+    validationResult,
+    setSettings,
+    runValidation,
+    runCurrentBacktest,
+  } = useBacktestStore();
 
   useThemeModeSync(themeMode);
 
@@ -78,6 +87,8 @@ export function BacktestWorkbench() {
       kpiRows={kpiRows}
       recentTrades={recentTrades}
       runStatus={runStatus}
+      validationResult={validationResult}
+      isValidating={isValidating}
       selectedStrategy={selectedStrategy}
       settings={settings}
       themeMode={themeMode}
@@ -97,6 +108,7 @@ export function BacktestWorkbench() {
 
       <AppHeader
         isRunning={isRunning}
+        isValidating={isValidating}
         selectedStrategy={selectedStrategy}
         strategyOptions={strategyOptions}
         isStrategyMenuOpen={isStrategyMenuOpen}
@@ -105,6 +117,9 @@ export function BacktestWorkbench() {
         themeMode={themeMode}
         onRunBacktest={() => {
           void runCurrentBacktest(selectedStrategy);
+        }}
+        onCheckCode={() => {
+          void runValidation(selectedStrategy);
         }}
         onOpenSettings={openSettings}
         onToggleTheme={toggleThemeMode}

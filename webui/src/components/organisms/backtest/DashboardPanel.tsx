@@ -14,6 +14,7 @@ import type {
   KpiMetric,
   KpiRow,
   MarketOhlcvPoint,
+  StrategyValidationResult,
   Trade,
 } from "@/types/backtest";
 import type { ThemeMode } from "@/types/theme";
@@ -25,6 +26,8 @@ interface DashboardPanelProps {
   readonly kpiRows: KpiRow[];
   readonly recentTrades: Trade[];
   readonly runStatus: BacktestRunStatus | null;
+  readonly validationResult: StrategyValidationResult | null;
+  readonly isValidating: boolean;
   readonly selectedStrategy: string;
   readonly settings: BacktestSettings;
   readonly themeMode: ThemeMode;
@@ -51,6 +54,8 @@ export const DashboardPanel = memo(function DashboardPanel({
   kpiRows,
   recentTrades,
   runStatus,
+  validationResult,
+  isValidating,
   selectedStrategy,
   settings,
   themeMode,
@@ -59,6 +64,69 @@ export const DashboardPanel = memo(function DashboardPanel({
   const interval = settings.interval.trim() || "—";
   const startDate = formatHeroDate(settings.startDate);
   const endDate = formatHeroDate(settings.endDate);
+
+  const firstValidationIssue =
+    validationResult && !validationResult.ready_to_backtest && validationResult.issues.length > 0
+      ? validationResult.issues[0]
+      : null;
+
+  const heroState = (() => {
+    if (firstValidationIssue) {
+      return {
+        tone: "error" as const,
+        title: "Strategy Validation Error",
+        message: firstValidationIssue.message,
+        meta: "[error] [" + firstValidationIssue.category + "] " + firstValidationIssue.file + (firstValidationIssue.line === null ? "" : ":" + firstValidationIssue.line),
+      };
+    }
+
+    if (isValidating) {
+      return {
+        tone: "ready" as const,
+        title: "Strategy Validation",
+        message: "Checking strategy code...",
+        meta: null,
+      };
+    }
+
+    if (runStatus?.tone === "success") {
+      return {
+        tone: "success" as const,
+        title: "Backtest Status",
+        message: runStatus.message,
+        meta: null,
+      };
+    }
+
+    if (runStatus?.tone === "error") {
+      return {
+        tone: "error" as const,
+        title: "Backtest Error",
+        message: runStatus.message,
+        meta: null,
+      };
+    }
+
+    if (validationResult?.ready_to_backtest) {
+      return {
+        tone: "ready" as const,
+        title: "Strategy Validation",
+        message: "Ready to backtest",
+        meta: null,
+      };
+    }
+
+    return null;
+  })();
+
+  const getHeroStateClass = (state: typeof heroState): string => {
+    if (!state) return "";
+    if (state.tone === "error") return "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]";
+    if (state.tone === "success") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]";
+    return "border-blue-500/30 bg-blue-500/10 text-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]";
+  };
+
+  const heroStateClass = getHeroStateClass(heroState);
 
   return (
     <div className="dashboard-panel-surface relative isolate h-full min-h-0 overflow-x-hidden overflow-y-auto px-5 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-7 lg:px-10">
@@ -72,7 +140,7 @@ export const DashboardPanel = memo(function DashboardPanel({
         <section className="relative overflow-hidden border-b border-border/80 px-2 pb-9 pt-8 sm:px-4 sm:pb-11 sm:pt-10 lg:px-6 lg:pb-12 lg:pt-12">
           <div className="relative flex min-h-[34svh] flex-col justify-center lg:min-h-[44svh]">
             <p className="hero-line-animation text-[0.7rem] uppercase tracking-[0.24em] text-muted-foreground">
-              Backtest Snapshot
+              Backtest Snapshot{' '}
               <span className="ml-2 inline-block normal-case tracking-[0.08em] text-foreground/80">
                 {selectedStrategy}
               </span>
@@ -80,42 +148,32 @@ export const DashboardPanel = memo(function DashboardPanel({
             <h2 className="hero-title-animation mt-3 font-display text-[clamp(3.75rem,12vw,10rem)] font-semibold leading-[0.9] tracking-[-0.04em] text-foreground">
               Backtest
             </h2>
-            {runStatus ? (
-              <div
-                className={[
-                  "status-line-animation mt-5 inline-flex max-w-[min(100%,30rem)] items-start gap-3 self-start rounded-2xl border px-4 py-3 backdrop-blur-sm",
-                  runStatus.tone === "error"
-                    ? "border-red-500/30 bg-red-500/10 text-red-100 shadow-[0_0_0_1px_rgba(239,68,68,0.08)]"
-                    : "border-emerald-400/30 bg-emerald-400/10 text-emerald-50 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]",
-                ].join(" ")}
-                role={runStatus.tone === "error" ? "alert" : undefined}
-                aria-live={runStatus.tone === "error" ? "assertive" : "polite"}
-              >
-                <span
-                  className={[
-                    "mt-1 h-2 w-2 shrink-0 rounded-full",
-                    runStatus.tone === "error"
-                      ? "bg-red-400 shadow-[0_0_18px_rgba(248,113,113,0.75)]"
-                      : "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.75)]",
-                  ].join(" ")}
-                  aria-hidden="true"
-                />
-                <div className="space-y-1">
-                  <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
-                    {runStatus.tone === "error" ? "Backtest Error" : "Backtest Status"}
-                  </p>
-                  <p className="whitespace-pre-line text-sm font-medium leading-6 text-current sm:text-[0.95rem]">
-                    {runStatus.message}
-                  </p>
-                </div>
-              </div>
-            ) : null}
             <p className="hero-line-animation-delay-1 mt-5 text-base font-medium tracking-wide text-foreground/85 sm:text-lg">
               {symbol} - {interval}
             </p>
             <p className="hero-line-animation-delay-2 mt-1 text-sm tracking-wide text-muted-foreground sm:text-base">
               {startDate} - {endDate}
             </p>
+            {heroState ? (
+              <div
+                className={[
+                  "status-line-animation mt-5 w-full rounded-2xl border px-4 py-3 backdrop-blur-sm",
+                  heroStateClass,
+                ].join(" ")}
+                role={heroState.tone === "error" ? "alert" : undefined}
+                aria-live={heroState.tone === "error" ? "assertive" : "polite"}
+              >
+                <p className="text-[0.65rem] font-medium uppercase tracking-[0.22em] text-current/70">
+                  {heroState.title}
+                </p>
+                {heroState.meta ? (
+                  <p className="mt-2 text-xs uppercase tracking-[0.16em] text-current/75">{heroState.meta}</p>
+                ) : null}
+                <p className="mt-2 whitespace-pre-wrap font-mono text-xs leading-5 text-current sm:text-sm">
+                  {heroState.message}
+                </p>
+              </div>
+            ) : null}
           </div>
         </section>
 
