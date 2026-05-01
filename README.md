@@ -2,7 +2,7 @@ https://github.com/user-attachments/assets/91c7c6b0-fa99-4624-80f1-5554134992d2
 
 # Z* (ZStar)
 
-Lightweight backtesting framework for running Python trading strategies from a CLI, a FastAPI backend, or a Next.js web UI.
+Lightweight backtesting framework for running Python trading strategies from a FastAPI backend, a Next.js web UI, or programmatic Python imports.
 
 ## What It Solves
 
@@ -13,11 +13,11 @@ ZStar gives you a small local workflow for testing a strategy against historical
 1. You define a Python strategy class that inherits from `CoreStrategy`.
 2. ZStar loads OHLCV data from Yahoo Finance.
 3. The backtest engine applies your signals, position sizing, fees, and slippage.
-4. Results are returned in the UI/API or written by the CLI as KPI JSON and an equity-curve HTML report.
+4. Results are returned in the UI/API and can also be consumed directly from Python objects.
 
 ## Main Capabilities
 
-- Run backtests from the web UI, CLI, or Python code
+- Run backtests from the web UI or Python code
 - Load strategy code dynamically
 - Configure fees, slippage, seed, balance, symbol, and date range
 - Return KPIs, trades, market candles, and equity curve data
@@ -43,6 +43,8 @@ pip install -r requirements.txt
 
 ## Quick Start
 
+This project now supports WebUI access and programmatic Python imports only.
+
 ### Web UI with Docker (recommended)
 
 ```bash
@@ -51,19 +53,6 @@ docker compose up --build
 
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8000`
-
-### CLI backtest
-
-```bash
-python -m zstar.cli backtest \
-  --strategy-file examples/cli/strategy.py \
-  --config-file examples/cli/cli_config.yaml
-```
-
-Default CLI outputs:
-
-- `outputs/kpis.json`
-- `outputs/equity_curve.html`
 
 ## Local Development
 
@@ -188,7 +177,7 @@ print(report.kpis())
 print(report.equity_curve().tail())
 ```
 
-For dynamic strategy files used by the UI or CLI, define exactly one `CoreStrategy` subclass and ZStar will inject `CoreStrategy`, `pd`, and `np` automatically.
+For dynamic strategy files used by the UI or API, define exactly one `CoreStrategy` subclass and ZStar will inject `CoreStrategy`, `pd`, and `np` automatically.
 
 ## Validation
 
