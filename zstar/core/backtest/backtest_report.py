@@ -13,6 +13,7 @@ class BacktestReport:
     trades: list[Trade]
     data: pd.DataFrame
     interval: str = "1d"
+    risk_free_rate: float = 0.0
 
 
     def _strategy_equity_curve(self) -> pd.Series:
@@ -31,19 +32,38 @@ class BacktestReport:
         return pd.Series(equity, index=index, name="strategy")
 
 
-    def _return_pct(self, final_value: float) -> float:
+    def _compute_return_pct(self, final_value: float) -> float:
+        """
+        Calculate percentage return.
+
+        Formula: ((final_value - initial_balance) / initial_balance) * 100
+
+        Edge cases:
+            - Returns 0.0 when initial_balance is zero because return is undefined.
+        """
         if self.initial_balance == 0:
             return 0.0
         return ((final_value - self.initial_balance) / self.initial_balance) * 100
 
 
     @staticmethod
-    def _max_drawdown_pct(equity_curve: pd.Series) -> float:
+    def _compute_max_drawdown_pct(equity_curve: pd.Series) -> float:
+        """
+        Calculate maximum drawdown percentage.
+
+        Formula: min((equity_t / rolling_peak_t - 1) * 100)
+
+        Edge cases:
+            - Returns 0.0 for empty curves.
+            - Ignores periods where rolling peak is not positive to avoid division by zero.
+        """
         if equity_curve.empty:
             return 0.0
 
         peak = equity_curve.cummax()
-        drawdown_pct = (equity_curve / peak - 1.0) * 100
+        drawdown_pct = (equity_curve[peak > 0] / peak[peak > 0] - 1.0) * 100
+        if drawdown_pct.empty:
+            return 0.0
         return float(drawdown_pct.min())
 
 
@@ -53,27 +73,69 @@ class BacktestReport:
 
         close_prices = self.data["close"].astype(float)
         first_close = float(close_prices.iloc[0])
+        if first_close <= 0:
+            return pd.Series(dtype=float, name="buy_and_hold")
+
         units = self.initial_balance / first_close
 
         return (close_prices * units).rename("buy_and_hold")
 
 
-    def _buy_and_hold_metrics(self, strategy_return_pct: float) -> dict[str, float]:
-        buy_and_hold_curve = self._buy_and_hold_equity_curve()
-        buy_and_hold_final = (
-            float(buy_and_hold_curve.iloc[-1])
-            if not buy_and_hold_curve.empty
-            else self.initial_balance
-        )
-        buy_and_hold_return_pct = self._return_pct(buy_and_hold_final)
-        buy_and_hold_max_drawdown_pct = self._max_drawdown_pct(buy_and_hold_curve)
+    def _compute_buy_and_hold_final_balance(self, buy_and_hold_curve: pd.Series) -> float:
+        """
+        Calculate final buy-and-hold account value.
 
-        return {
-            "buy_and_hold_final_balance": buy_and_hold_final,
-            "buy_and_hold_return_pct": buy_and_hold_return_pct,
-            "buy_and_hold_max_drawdown_pct": buy_and_hold_max_drawdown_pct,
-            "return_diff_vs_buy_and_hold_pct": strategy_return_pct - buy_and_hold_return_pct,
-        }
+        Formula: close_last * (initial_balance / close_first)
+
+        Edge cases:
+            - Returns initial_balance when buy-and-hold cannot be built.
+        """
+        if buy_and_hold_curve.empty:
+            return float(self.initial_balance)
+        return float(buy_and_hold_curve.iloc[-1])
+
+
+    def _compute_buy_and_hold_return_pct(self, buy_and_hold_final: float) -> float:
+        """
+        Calculate buy-and-hold percentage return.
+
+        Formula: ((buy_and_hold_final - initial_balance) / initial_balance) * 100
+
+        Edge cases:
+            - Returns 0.0 when initial_balance is zero because return is undefined.
+        """
+        return self._compute_return_pct(buy_and_hold_final)
+
+
+    def _compute_buy_and_hold_max_drawdown_pct(
+        self,
+        buy_and_hold_curve: pd.Series,
+    ) -> float:
+        """
+        Calculate buy-and-hold maximum drawdown percentage.
+
+        Formula: min((equity_t / rolling_peak_t - 1) * 100)
+
+        Edge cases:
+            - Returns 0.0 for empty or non-positive buy-and-hold curves.
+        """
+        return self._compute_max_drawdown_pct(buy_and_hold_curve)
+
+
+    def _compute_return_diff_vs_buy_and_hold_pct(
+        self,
+        strategy_return_pct: float,
+        buy_and_hold_return_pct: float,
+    ) -> float:
+        """
+        Calculate strategy return minus buy-and-hold return.
+
+        Formula: strategy_return_pct - buy_and_hold_return_pct
+
+        Edge cases:
+            - Uses already-normalized percentages, so no division occurs here.
+        """
+        return strategy_return_pct - buy_and_hold_return_pct
 
 
     def equity_curve(self) -> pd.DataFrame:
@@ -86,14 +148,25 @@ class BacktestReport:
 
 
     def _compute_sharpe_ratio(self, strategy_returns: pd.Series) -> float:
-        sharpe_ratio = np.nan
+        """
+        Calculate annualized Sharpe ratio.
 
-        if strategy_returns.size > 1:
-            returns_std = strategy_returns.std(ddof=1)
-            if returns_std > 0:
-                sharpe_ratio = (strategy_returns.mean() / returns_std) * np.sqrt(self._annualization_factor())
+        Formula: mean(r_t - rf_period) / std(r_t, ddof=1) * sqrt(periods_per_year)
 
-        return float(sharpe_ratio)
+        Edge cases:
+            - Returns NaN for fewer than two returns or zero return volatility.
+            - risk_free_rate is annual decimal return, converted to a per-period rate.
+        """
+        if strategy_returns.size <= 1:
+            return float(np.nan)
+
+        returns_std = strategy_returns.std(ddof=1)
+        if returns_std <= 0:
+            return float(np.nan)
+
+        annualization_factor = self._annualization_factor()
+        excess_return = strategy_returns.mean() - (self.risk_free_rate / annualization_factor)
+        return float((excess_return / returns_std) * np.sqrt(annualization_factor))
 
 
     def _annualization_factor(self) -> float:
@@ -132,7 +205,15 @@ class BacktestReport:
         return parsed_value if parsed_value > 0 else None
 
 
-    def _average_trade_duration_minutes(self) -> float:
+    def _compute_avg_trade_duration_minutes(self) -> float:
+        """
+        Calculate average elapsed minutes per trade.
+
+        Formula: mean((exit_datetime - entry_datetime).total_seconds() / 60)
+
+        Edge cases:
+            - Returns 0.0 when there are no trades.
+        """
         if len(self.trades) == 0:
             return 0.0
 
@@ -144,28 +225,199 @@ class BacktestReport:
         return float(np.mean(durations))
 
 
+    def _trade_pnls(self) -> np.ndarray:
+        return np.array([trade.net_pnl for trade in self.trades], dtype=float)
+
+
+    def _winning_pnls(self, pnls: np.ndarray) -> np.ndarray:
+        return pnls[pnls > 0]
+
+
+    def _losing_pnls(self, pnls: np.ndarray) -> np.ndarray:
+        return pnls[pnls < 0]
+
+
+    def _compute_net_pnl(self) -> float:
+        """
+        Calculate net profit and loss.
+
+        Formula: final_balance - initial_balance
+
+        Edge cases:
+            - Negative values correctly indicate a losing backtest.
+        """
+        return float(self.final_balance - self.initial_balance)
+
+
+    def _compute_total_trades(self) -> int:
+        return len(self.trades)
+
+
+    def _compute_total_fees(self) -> float:
+        """
+        Calculate total fees paid.
+
+        Formula: sum(entry_fee_i + exit_fee_i)
+
+        Edge cases:
+            - Returns 0.0 when there are no trades.
+        """
+        return float(sum(trade.total_fees for trade in self.trades))
+
+
+    def _compute_gross_profit(self, wins: np.ndarray) -> float:
+        """
+        Calculate gross profit from winning trades.
+
+        Formula: sum(net_pnl_i for net_pnl_i > 0)
+
+        Edge cases:
+            - Returns 0.0 when there are no winning trades.
+        """
+        return float(wins.sum()) if wins.size > 0 else 0.0
+
+
+    def _compute_gross_loss(self, losses: np.ndarray) -> float:
+        """
+        Calculate absolute gross loss from losing trades.
+
+        Formula: abs(sum(net_pnl_i for net_pnl_i < 0))
+
+        Edge cases:
+            - Returns 0.0 when there are no losing trades.
+        """
+        return float(abs(losses.sum())) if losses.size > 0 else 0.0
+
+
+    def _compute_win_rate_pct(self, wins: np.ndarray, total_trades: int) -> float:
+        """
+        Calculate percentage of trades with positive net PnL.
+
+        Formula: count(net_pnl_i > 0) / total_trades * 100
+
+        Edge cases:
+            - Returns 0.0 when there are no trades.
+        """
+        if total_trades == 0:
+            return 0.0
+        return float((wins.size / total_trades) * 100)
+
+
+    def _compute_avg_trade_pnl(self, pnls: np.ndarray) -> float:
+        """
+        Calculate mean net PnL per trade.
+
+        Formula: mean(net_pnl_i)
+
+        Edge cases:
+            - Returns 0.0 when there are no trades.
+        """
+        return float(pnls.mean()) if pnls.size > 0 else 0.0
+
+
+    def _compute_avg_win(self, wins: np.ndarray) -> float:
+        """
+        Calculate mean net PnL among winning trades.
+
+        Formula: mean(net_pnl_i for net_pnl_i > 0)
+
+        Edge cases:
+            - Returns 0.0 when there are no winning trades.
+        """
+        return float(wins.mean()) if wins.size > 0 else 0.0
+
+
+    def _compute_avg_loss(self, losses: np.ndarray) -> float:
+        """
+        Calculate mean net PnL among losing trades.
+
+        Formula: mean(net_pnl_i for net_pnl_i < 0)
+
+        Edge cases:
+            - Returns 0.0 when there are no losing trades.
+            - Returned value is negative by definition.
+        """
+        return float(losses.mean()) if losses.size > 0 else 0.0
+
+
+    def _compute_profit_factor(self, gross_profit: float, gross_loss: float) -> float:
+        """
+        Calculate profit factor.
+
+        Formula: gross_profit / gross_loss
+
+        Edge cases:
+            - Returns inf when profits exist and gross_loss is zero.
+            - Returns NaN when both gross_profit and gross_loss are zero.
+        """
+        if gross_loss > 0:
+            return float(gross_profit / gross_loss)
+        return float(np.inf) if gross_profit > 0 else float(np.nan)
+
+
+    def _compute_expectancy(self, pnls: np.ndarray) -> float:
+        """
+        Calculate expected net PnL per trade.
+
+        Formula: mean(net_pnl_i)
+
+        Edge cases:
+            - Returns 0.0 when there are no trades.
+            - Currently equivalent to avg_trade_pnl by design.
+        """
+        return self._compute_avg_trade_pnl(pnls)
+
+
+    def _compute_best_trade(self, pnls: np.ndarray) -> float:
+        """
+        Calculate best trade net PnL.
+
+        Formula: max(net_pnl_i)
+
+        Edge cases:
+            - Returns 0.0 when there are no trades.
+        """
+        return float(pnls.max()) if pnls.size > 0 else 0.0
+
+
+    def _compute_worst_trade(self, pnls: np.ndarray) -> float:
+        """
+        Calculate worst trade net PnL.
+
+        Formula: min(net_pnl_i)
+
+        Edge cases:
+            - Returns 0.0 when there are no trades.
+        """
+        return float(pnls.min()) if pnls.size > 0 else 0.0
+
+
+    def _compute_median_trade(self, pnls: np.ndarray) -> float:
+        """
+        Calculate median trade net PnL.
+
+        Formula: median(net_pnl_i)
+
+        Edge cases:
+            - Returns 0.0 when there are no trades.
+        """
+        return float(np.median(pnls)) if pnls.size > 0 else 0.0
+
+
     def kpis(self) -> dict[str, float]:
-        total_trades = len(self.trades)
-        net_pnl = self.final_balance - self.initial_balance
-        total_return_pct = self._return_pct(self.final_balance)
+        pnls = self._trade_pnls()
+        wins = self._winning_pnls(pnls)
+        losses = self._losing_pnls(pnls)
+        total_trades = self._compute_total_trades()
+        net_pnl = self._compute_net_pnl()
+        total_return_pct = self._compute_return_pct(self.final_balance)
+        gross_profit = self._compute_gross_profit(wins)
+        gross_loss = self._compute_gross_loss(losses)
         strategy_curve = self._strategy_equity_curve()
-        strategy_max_drawdown_pct = self._max_drawdown_pct(strategy_curve)
         strategy_returns = strategy_curve.pct_change().dropna()
-
-        pnls = np.array([trade.net_pnl for trade in self.trades], dtype=float)
-        total_fees = float(sum(trade.total_fees for trade in self.trades))
-        wins = pnls[pnls > 0]
-        losses = pnls[pnls < 0]
-
-        gross_profit = wins.sum() if wins.size > 0 else 0.0
-        gross_loss = abs(losses.sum()) if losses.size > 0 else 0.0
-        profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else np.nan
-        sharpe_ratio = self._compute_sharpe_ratio(strategy_returns)
-
-        best_trade = float(pnls.max()) if total_trades > 0 else 0.0
-        worst_trade = float(pnls.min()) if total_trades > 0 else 0.0
-        median_trade = float(np.median(pnls)) if total_trades > 0 else 0.0
-        avg_trade_duration_minutes = self._average_trade_duration_minutes()
+        buy_and_hold_curve = self._buy_and_hold_equity_curve()
+        buy_and_hold_final = self._compute_buy_and_hold_final_balance(buy_and_hold_curve)
+        buy_and_hold_return_pct = self._compute_buy_and_hold_return_pct(buy_and_hold_final)
 
         metrics = {
             "initial_balance": self.initial_balance,
@@ -173,22 +425,30 @@ class BacktestReport:
             "net_pnl": net_pnl,
             "total_return_pct": total_return_pct,
             "total_trades": total_trades,
-            "total_fees": total_fees,
-            "gross_profit": float(gross_profit),
-            "gross_loss": float(gross_loss),
-            "win_rate_pct": (wins.size / total_trades) * 100 if total_trades > 0 else 0.0,
-            "avg_trade_pnl": float(pnls.mean()) if total_trades > 0 else 0.0,
-            "avg_win": float(wins.mean()) if wins.size > 0 else 0.0,
-            "avg_loss": float(losses.mean()) if losses.size > 0 else 0.0,
-            "profit_factor": float(profit_factor),
-            "expectancy": float(pnls.mean()) if total_trades > 0 else 0.0,
-            "max_drawdown_pct": strategy_max_drawdown_pct,
-            "sharpe_ratio": float(sharpe_ratio),
-            "best_trade": best_trade,
-            "worst_trade": worst_trade,
-            "median_trade": median_trade,
-            "avg_trade_duration_minutes": avg_trade_duration_minutes,
+            "total_fees": self._compute_total_fees(),
+            "gross_profit": gross_profit,
+            "gross_loss": gross_loss,
+            "win_rate_pct": self._compute_win_rate_pct(wins, total_trades),
+            "avg_trade_pnl": self._compute_avg_trade_pnl(pnls),
+            "avg_win": self._compute_avg_win(wins),
+            "avg_loss": self._compute_avg_loss(losses),
+            "profit_factor": self._compute_profit_factor(gross_profit, gross_loss),
+            "expectancy": self._compute_expectancy(pnls),
+            "max_drawdown_pct": self._compute_max_drawdown_pct(strategy_curve),
+            "sharpe_ratio": self._compute_sharpe_ratio(strategy_returns),
+            "best_trade": self._compute_best_trade(pnls),
+            "worst_trade": self._compute_worst_trade(pnls),
+            "median_trade": self._compute_median_trade(pnls),
+            "avg_trade_duration_minutes": self._compute_avg_trade_duration_minutes(),
+            "buy_and_hold_final_balance": buy_and_hold_final,
+            "buy_and_hold_return_pct": buy_and_hold_return_pct,
+            "buy_and_hold_max_drawdown_pct": self._compute_buy_and_hold_max_drawdown_pct(
+                buy_and_hold_curve,
+            ),
+            "return_diff_vs_buy_and_hold_pct": self._compute_return_diff_vs_buy_and_hold_pct(
+                total_return_pct,
+                buy_and_hold_return_pct,
+            ),
         }
 
-        metrics.update(self._buy_and_hold_metrics(total_return_pct))
         return metrics
