@@ -178,8 +178,13 @@ class ValidateStrategy:
         sys.modules[package_name] = package_module
         sys.modules[module_name] = module
 
-        compiled = compile(code, str(self.strategy_path), "exec")
-        exec(compiled, scope, scope)
+        try:
+            compiled = compile(code, str(self.strategy_path), "exec")
+            exec(compiled, scope, scope)
+        finally:
+            sys.modules.pop(module_name, None)
+            sys.modules.pop(package_name, None)
+        
         return scope
     
 

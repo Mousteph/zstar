@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 
 from zstar.core.backtest.backtest_report import BacktestReport
 from zstar.core.strategy import CoreStrategy
-from zstar.core.strategy.validate_strategy import ValidationIssue, ValidationResult
-from zstar.api.backtest.strategy_models import ValidateStrategiesResponse, ValidationIssueResponse
+from zstar.core.strategy.validate_strategy import ValidationResult
+from zstar.api.backtest.models import ValidateStrategiesResponse, ValidationIssueResponse
 from zstar.api.start_backend import app
 
 backtest_router_module = importlib.import_module("zstar.api.backtest.backtest_router")
