@@ -161,7 +161,7 @@ def test_kpis_are_calculated_correctly_for_deterministic_inputs():
     assert kpis['avg_win'] == pytest.approx(40.0)
     assert kpis['avg_loss'] == pytest.approx(-20.0)
     assert kpis['profit_factor'] == pytest.approx(4.0)
-    assert kpis['expectancy'] == pytest.approx(20.0)
+    assert 'expectancy' not in kpis
     assert kpis['max_drawdown_pct'] == pytest.approx(-1.904761904761909)
     assert kpis['sharpe_ratio'] == pytest.approx(expected_sharpe)
     assert kpis['best_trade'] == pytest.approx(50.0)
@@ -205,7 +205,7 @@ def test_kpis_with_no_trades_produces_expected_zero_and_nan_values():
     assert kpis['avg_win'] == pytest.approx(0.0)
     assert kpis['avg_loss'] == pytest.approx(0.0)
     assert np.isnan(kpis['profit_factor'])
-    assert kpis['expectancy'] == pytest.approx(0.0)
+    assert 'expectancy' not in kpis
     assert kpis['max_drawdown_pct'] == pytest.approx(0.0)
     assert np.isnan(kpis['sharpe_ratio'])
     assert kpis['best_trade'] == pytest.approx(0.0)
@@ -216,3 +216,123 @@ def test_kpis_with_no_trades_produces_expected_zero_and_nan_values():
     assert kpis['buy_and_hold_return_pct'] == pytest.approx(2.0)
     assert kpis['buy_and_hold_max_drawdown_pct'] == pytest.approx(0.0)
     assert kpis['return_diff_vs_buy_and_hold_pct'] == pytest.approx(-2.0)
+
+
+def test_profit_factor_is_infinite_when_no_losses_exist():
+    index = pd.date_range('2026-01-01', periods=3, freq='D')
+    data = pd.DataFrame(
+        {
+            'open': [100.0, 101.0, 102.0],
+            'close': [100.0, 101.0, 102.0],
+        },
+        index=index,
+    )
+    trades = [
+        _trade(
+            trade_id='t1',
+            entry_datetime=index[0],
+            exit_datetime=index[1],
+            net_pnl=25.0,
+        ),
+        _trade(
+            trade_id='t2',
+            entry_datetime=index[1],
+            exit_datetime=index[2],
+            net_pnl=15.0,
+        ),
+    ]
+    report = BacktestReport(1000.0, 1040.0, trades, data)
+
+    assert np.isinf(report.kpis()['profit_factor'])
+
+
+def test_strategy_equity_curve_marks_open_trade_to_market():
+    index = pd.date_range('2026-01-01', periods=4, freq='D')
+    data = pd.DataFrame(
+        {
+            'open': [100.0, 100.0, 100.0, 100.0],
+            'close': [100.0, 110.0, 90.0, 120.0],
+        },
+        index=index,
+    )
+    trade = Trade(
+        id='t1',
+        trade_name='',
+        side=TradeSide.LONG,
+        size=2.0,
+        entry_price=100.0,
+        exit_price=120.0,
+        entry_datetime=index[0],
+        exit_datetime=index[3],
+        raw_pnl=40.0,
+        entry_fee=1.0,
+        exit_fee=2.0,
+        total_fees=3.0,
+        net_pnl=37.0,
+    )
+    report = BacktestReport(1000.0, 1037.0, [trade], data)
+
+    assert report._strategy_equity_curve().tolist() == pytest.approx(
+        [999.0, 1019.0, 979.0, 1037.0],
+    )
+    assert report.kpis()['max_drawdown_pct'] == pytest.approx(-3.925417075564278)
+
+
+def test_sharpe_ratio_subtracts_periodic_risk_free_rate():
+    index = pd.date_range('2026-01-01', periods=4, freq='D')
+    data = pd.DataFrame(
+        {
+            'open': [100.0, 100.0, 100.0, 100.0],
+            'close': [100.0, 100.0, 100.0, 100.0],
+        },
+        index=index,
+    )
+    trades = [
+        _trade(
+            trade_id='t1',
+            entry_datetime=index[0],
+            exit_datetime=index[1],
+            net_pnl=10.0,
+        ),
+        _trade(
+            trade_id='t2',
+            entry_datetime=index[1],
+            exit_datetime=index[2],
+            net_pnl=-5.0,
+        ),
+        _trade(
+            trade_id='t3',
+            entry_datetime=index[2],
+            exit_datetime=index[3],
+            net_pnl=15.0,
+        ),
+    ]
+    report = BacktestReport(
+        initial_balance=1000.0,
+        final_balance=1020.0,
+        trades=trades,
+        data=data,
+        risk_free_rate=0.0252,
+    )
+
+    returns = report._strategy_equity_curve().pct_change().dropna()
+    expected = ((returns.mean() - (0.0252 / 252.0)) / returns.std(ddof=1)) * np.sqrt(252.0)
+
+    assert report.kpis()['sharpe_ratio'] == pytest.approx(float(expected))
+
+
+def test_buy_and_hold_handles_non_positive_start_price():
+    index = pd.date_range('2026-01-01', periods=2, freq='D')
+    data = pd.DataFrame(
+        {
+            'open': [0.0, 100.0],
+            'close': [0.0, 100.0],
+        },
+        index=index,
+    )
+    report = BacktestReport(1000.0, 1000.0, [], data)
+    kpis = report.kpis()
+
+    assert kpis['buy_and_hold_final_balance'] == pytest.approx(1000.0)
+    assert kpis['buy_and_hold_return_pct'] == pytest.approx(0.0)
+    assert kpis['buy_and_hold_max_drawdown_pct'] == pytest.approx(0.0)
