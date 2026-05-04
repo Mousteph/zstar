@@ -2,12 +2,15 @@ export type KpiMetricTone = "positive" | "neutral" | "negative";
 export type KpiMetricIcon = "trending-up" | "activity" | "trending-down";
 
 export type TradeSide = "LONG" | "SHORT";
+export type BacktestDataSource = "yahoo" | "csv";
 
 export interface BacktestSettings {
+  dataSource: BacktestDataSource;
   symbol: string;
   startDate: string;
   endDate: string;
   interval: string;
+  csvFilename: string;
   initialBalance: number;
   entryFeePct: number;
   exitFeePct: number;
@@ -42,12 +45,18 @@ export interface ValidateStrategyRequest {
 }
 
 export interface BacktestRunRequest {
-  data: {
-    symbol: string;
-    start_date: string;
-    end_date: string;
-    interval: string;
-  };
+  data:
+    | {
+        source: "yahoo";
+        symbol: string;
+        start_date: string;
+        end_date: string;
+        interval: string;
+      }
+    | {
+        source: "csv";
+        filename: string;
+      };
   strategy_filename?: string;
   backtest_config: {
     initial_balance: number;
@@ -125,4 +134,13 @@ export interface BacktestRunEnvelopeResponse {
 
 export interface StrategiesResponse {
   strategies: string[];
+}
+
+export interface CsvFilesResponse {
+  files: string[];
+}
+
+export interface CsvFileUploadResponse {
+  filename: string;
+  files: string[];
 }

@@ -10,6 +10,7 @@ frontend:
   backend_proxy_url: "http://backend:8000"
 paths:
   strategies_dir: "strategies"
+  data_dir: "data"
   default_strategy_name: "default_strategy"
 logging:
   level: "DEBUG"

@@ -1,6 +1,8 @@
 import type {
   BacktestRunEnvelopeResponse,
   BacktestRunRequest,
+  CsvFilesResponse,
+  CsvFileUploadResponse,
   StrategiesResponse,
   StrategyValidationResult,
   ValidateStrategyRequest,
@@ -98,4 +100,65 @@ export async function checkStrategyCode(payload: ValidateStrategyRequest): Promi
   }
 
   return responseJson as StrategyValidationResult;
+}
+
+export async function fetchCsvFiles(): Promise<string[]> {
+  const response = await fetch("/api/backtest/csv-files", {
+    method: "GET",
+  });
+
+  const responseJson = (await response.json()) as
+    | CsvFilesResponse
+    | {
+        detail?: string;
+      };
+
+  if (!response.ok) {
+    const detail =
+      "detail" in responseJson && typeof responseJson.detail === "string"
+        ? responseJson.detail
+        : "Unable to fetch CSV files.";
+    throw new Error(detail);
+  }
+
+  if (!("files" in responseJson) || !Array.isArray(responseJson.files)) {
+    throw new Error("Invalid CSV files response payload.");
+  }
+
+  return responseJson.files;
+}
+
+export async function uploadCsvFile(file: File): Promise<CsvFileUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch("/api/backtest/csv-files", {
+    method: "POST",
+    body: formData,
+  });
+
+  const responseJson = (await response.json()) as
+    | CsvFileUploadResponse
+    | {
+        detail?: string;
+      };
+
+  if (!response.ok) {
+    const detail =
+      "detail" in responseJson && typeof responseJson.detail === "string"
+        ? responseJson.detail
+        : "Unable to upload CSV file.";
+    throw new Error(detail);
+  }
+
+  if (
+    !("filename" in responseJson) ||
+    typeof responseJson.filename !== "string" ||
+    !("files" in responseJson) ||
+    !Array.isArray(responseJson.files)
+  ) {
+    throw new Error("Invalid CSV upload response payload.");
+  }
+
+  return responseJson;
 }

@@ -32,14 +32,15 @@ class SimpleStrategy(CoreStrategy):
 
 
 class _FakePaths:
-    def __init__(self, strategies_dir: Path, default_strategy_name: str = "default_strategy") -> None:
+    def __init__(self, strategies_dir: Path, data_dir: Path | None = None, default_strategy_name: str = "default_strategy") -> None:
         self.strategies_dir = strategies_dir
+        self.data_dir = data_dir or strategies_dir
         self.default_strategy_name = default_strategy_name
 
 
 class _FakeConfig:
-    def __init__(self, strategies_dir: Path, default_strategy_name: str = "default_strategy") -> None:
-        self.paths = _FakePaths(strategies_dir, default_strategy_name)
+    def __init__(self, strategies_dir: Path, data_dir: Path | None = None, default_strategy_name: str = "default_strategy") -> None:
+        self.paths = _FakePaths(strategies_dir, data_dir, default_strategy_name)
 
 
 def test_health_endpoint_returns_ok():
@@ -68,6 +69,22 @@ def _payload(strategy_filename: str | None = None) -> dict:
     if strategy_filename is not None:
         payload["strategy_filename"] = strategy_filename
     return payload
+
+
+def _csv_payload(filename: str = "apple_2020.csv") -> dict:
+    return {
+        "data": {
+            "source": "csv",
+            "filename": filename,
+        },
+        "backtest_config": {
+            "initial_balance": 1000.0,
+            "entry_fee_pct": 0.0,
+            "exit_fee_pct": 0.0,
+            "slippage_pct": 0.0,
+            "slippage_seed": 42,
+        },
+    }
 
 
 def _price_frame() -> pd.DataFrame:
@@ -134,6 +151,78 @@ def test_run_backtest_returns_complete_payload(monkeypatch):
     assert "sharpe_ratio" in body["backtest_result"]["kpis"]
     assert "best_trade" in body["backtest_result"]["kpis"]
     assert "worst_trade" in body["backtest_result"]["kpis"]
+
+
+def test_csv_files_endpoint_returns_csv_filenames(monkeypatch, tmp_path):
+    data_dir = tmp_path / "Data"
+    data_dir.mkdir()
+    (data_dir / "alpha.csv").write_text("date,open,high,low,close,volume\n", encoding="utf-8")
+    (data_dir / "notes.txt").write_text("ignore", encoding="utf-8")
+    (data_dir / "beta.CSV").write_text("date,open,high,low,close,volume\n", encoding="utf-8")
+
+    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", data_dir))
+
+    response = client.get("/api/backtest/csv-files")
+
+    assert response.status_code == 200
+    assert response.json() == {"files": ["alpha.csv", "beta.CSV"]}
+
+
+def test_csv_upload_endpoint_saves_csv_file(monkeypatch, tmp_path):
+    data_dir = tmp_path / "Data"
+
+    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", data_dir))
+
+    response = client.post(
+        "/api/backtest/csv-files",
+        files={"file": ("uploaded.csv", b"date,open,high,low,close,volume\n2025-01-01,99,102,98,101,900\n", "text/csv")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"filename": "uploaded.csv", "files": ["uploaded.csv"]}
+    assert (data_dir / "uploaded.csv").exists()
+
+
+def test_csv_upload_endpoint_rejects_non_csv_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", tmp_path / "Data"))
+
+    response = client.post(
+        "/api/backtest/csv-files",
+        files={"file": ("uploaded.txt", b"not,csv\n", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert "csv_data_error" in response.json()["detail"].lower()
+
+
+def test_run_backtest_uses_csv_source_and_filename_symbol(monkeypatch):
+    class _FakeCsvData:
+        def __init__(self, filename):
+            self.filename = filename
+            self.data = _price_frame()
+            self.interval = "1d"
+
+        def get_data(self):
+            return self.data.copy()
+
+        def get_interval(self):
+            return self.interval
+
+    monkeypatch.setattr(backtest_router_module, "CsvData", _FakeCsvData)
+    monkeypatch.setattr(backtest_router_module, "resolve_csv_file", lambda _filename: Path("apple_2020.csv"))
+    monkeypatch.setattr(
+        backtest_router_module,
+        "resolve_strategy_validation",
+        lambda _strategy_filename: type("Payload", (), {"strategy": SimpleStrategy(), "validation": type("Validation", (), {"ready_to_backtest": True, "strategy_filename": "default_strategy.py", "total_errors": 0, "summary_text": "Ready to backtest", "issues": []})()})(),
+    )
+
+    response = client.post("/api/backtest/run", json=_csv_payload("apple_2020.csv"))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["backtest_result"]["meta"]["symbol"] == "APPLE_2020"
+    assert body["backtest_result"]["meta"]["interval"] == "1d"
+    assert body["backtest_result"]["trades"][0]["symbol"] == "APPLE_2020"
 
 
 def test_list_strategies_returns_python_filenames_without_extension(monkeypatch, tmp_path):

@@ -77,6 +77,7 @@ class PathsConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     strategies_dir: Path = Field(...)
+    data_dir: Path = Field(...)
     default_strategy_name: str = Field(..., min_length=1, pattern=r"^[A-Za-z0-9_-]+$")
 
     @field_validator("strategies_dir")
@@ -95,6 +96,26 @@ class PathsConfig(BaseModel):
             raise ValueError(
                 "paths.strategies_dir must point to a directory. "
                 "Expected format: relative or absolute path. Example: strategies"
+            )
+
+        return resolved
+
+    @field_validator("data_dir")
+    @classmethod
+    def validate_data_dir(cls, value: Path, info: Any) -> Path:
+        base_dir = Path(info.context["base_dir"]) if info.context and "base_dir" in info.context else Path.cwd()
+        resolved = value if value.is_absolute() else base_dir / value
+        resolved = resolved.resolve()
+
+        if not resolved.exists():
+            raise ValueError(
+                "paths.data_dir must point to an existing directory. "
+                "Expected format: relative or absolute path. Example: data"
+            )
+        if not resolved.is_dir():
+            raise ValueError(
+                "paths.data_dir must point to a directory. "
+                "Expected format: relative or absolute path. Example: data"
             )
 
         return resolved
@@ -153,8 +174,9 @@ FIELD_HINTS = {
     "frontend.host": "Expected non-empty hostname or IP address. Example: 0.0.0.0",
     "frontend.port": "Expected integer from 1 to 65535. Example: 3000",
     "frontend.backend_proxy_url": "Expected HTTP(S) URL. Example: http://backend:8000",
-    "paths": "Expected object with strategies_dir and default_strategy_name. Example: paths: {strategies_dir: 'strategies', default_strategy_name: 'default_strategy'}",
+    "paths": "Expected object with strategies_dir, data_dir, and default_strategy_name. Example: paths: {strategies_dir: 'strategies', data_dir: 'data', default_strategy_name: 'default_strategy'}",
     "paths.strategies_dir": "Expected existing directory path. Example: strategies",
+    "paths.data_dir": "Expected existing directory path. Example: data",
     "paths.default_strategy_name": "Expected base filename without extension. Example: default_strategy",
     "logging": "Expected object with level, directory, filename, max_bytes, backup_count, and stdout.",
     "logging.level": "Expected one of: DEBUG, INFO, WARNING, ERROR, CRITICAL. Example: INFO",

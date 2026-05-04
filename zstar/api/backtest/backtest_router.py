@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
+from zstar.api.utils import resolve_csv_file
 from zstar.core.backtest import BacktestReport, BacktesterEngine
-from zstar.core.data_loader import YahooData
+from zstar.core.data_loader import CsvData, DataHandler, YahooData
 from zstar.core.exceptions import BacktestServiceError, StrategyValidationError
 from zstar.logger import get_logger
 
@@ -25,13 +26,7 @@ responses = {
 
 @router.post("/run", responses=responses)
 def run_backtest(request: BacktestRunRequest) -> BacktestRunEnvelopeResponse:
-    logger.info(
-        "Backtest requested symbol=%s interval=%s start_date=%s end_date=%s",
-        request.data.symbol,
-        request.data.interval,
-        request.data.start_date,
-        request.data.end_date,
-    )
+    log_backtest_request(request)
 
     try:
         validation_payload = resolve_strategy_validation(request.strategy_filename)
@@ -44,7 +39,7 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunEnvelopeResponse:
         if validation_payload.strategy is None:
             raise StrategyValidationError("Strategy could not be instantiated after validation.")
 
-        data_handler = YahooData(request.data)
+        data_handler = build_data_handler(request)
         backtest_engine = BacktesterEngine(
             validation_payload.strategy,
             data_handler,
@@ -54,7 +49,7 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunEnvelopeResponse:
         data = data_handler.get_data()
         logger.info(
             "Backtest completed symbol=%s bars_count=%s trades_count=%s",
-            request.data.symbol,
+            response_symbol(request),
             len(data),
             len(report.trades),
         )
@@ -71,14 +66,61 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunEnvelopeResponse:
         backtest_result=BacktestRunResponse(
             equity_curve=serialize_equity_curve(report),
             market_ohlcv=serialize_market_ohlcv(report),
-            trades=serialize_trades(report.trades, symbol=request.data.symbol),
+            trades=serialize_trades(report.trades, symbol=response_symbol(request)),
             kpis=serialize_kpis(report),
-            meta=build_backtest_meta(
-                symbol=request.data.symbol,
-                start_date=request.data.start_date,
-                end_date=request.data.end_date,
-                interval=request.data.interval,
-                bars_count=len(data),
-            ),
+            meta=build_response_meta(request, data_handler, len(data)),
         ),
     )
+
+
+def log_backtest_request(request: BacktestRunRequest) -> None:
+    if request.data.source == "csv":
+        logger.info("Backtest requested source=csv filename=%s", request.data.filename)
+        return
+
+    logger.info(
+        "Backtest requested source=yahoo symbol=%s interval=%s start_date=%s end_date=%s",
+        request.data.symbol,
+        request.data.interval,
+        request.data.start_date,
+        request.data.end_date,
+    )
+
+
+def build_data_handler(request: BacktestRunRequest) -> DataHandler:
+    if request.data.source == "csv":
+        return CsvData(str(resolve_csv_file(request.data.filename)))
+
+    return YahooData(
+        symbol=request.data.symbol,
+        start_date=request.data.start_date,
+        end_date=request.data.end_date,
+        interval=request.data.interval,
+    )
+
+
+def build_response_meta(request: BacktestRunRequest, data_handler: DataHandler, bars_count: int):
+    if request.data.source == "csv":
+        data = data_handler.get_data()
+        return build_backtest_meta(
+            symbol=response_symbol(request),
+            start_date=str(data.index.min().date()),
+            end_date=str(data.index.max().date()),
+            interval=data_handler.get_interval(),
+            bars_count=bars_count,
+        )
+
+    return build_backtest_meta(
+        symbol=request.data.symbol,
+        start_date=request.data.start_date or "",
+        end_date=request.data.end_date or "",
+        interval=request.data.interval,
+        bars_count=bars_count,
+    )
+
+
+def response_symbol(request: BacktestRunRequest) -> str:
+    if request.data.source == "csv":
+        return request.data.filename.rsplit(".", 1)[0].upper()
+
+    return request.data.symbol

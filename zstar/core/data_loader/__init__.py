@@ -1,9 +1,9 @@
 from .data_handler import DataHandler
-from .data_loader_model import DataLoaderConfigModel
+from .csv_data import CsvData
 from .yahoo_data import YahooData
 
 __all__ = [
+    "CsvData",
     "DataHandler",
-    "DataLoaderConfigModel",
     "YahooData",
 ]

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { Upload, X } from "lucide-react";
 
 import { Button } from "@/components/atoms/Button";
 import { TIMEFRAME_OPTIONS } from "@/features/backtest/constants";
@@ -11,8 +11,14 @@ import type { BacktestSettings } from "@/types/backtest";
 interface BacktestSettingsPanelProps {
   readonly isOpen: boolean;
   readonly settings: BacktestSettings;
+  readonly csvFiles: string[];
+  readonly csvFilesError: string | null;
+  readonly isCsvFilesLoading: boolean;
+  readonly isCsvUploading: boolean;
   readonly onClose: () => void;
   readonly onSettingsChange: (settings: BacktestSettings) => void;
+  readonly onLoadCsvFiles: () => Promise<void>;
+  readonly onUploadCsv: (file: File) => Promise<void>;
 }
 
 function updateNumberField(value: string, fallback: number): number {
@@ -26,8 +32,14 @@ const SETTINGS_FIELD_CLASS_NAME =
 export function BacktestSettingsPanel({
   isOpen,
   settings,
+  csvFiles,
+  csvFilesError,
+  isCsvFilesLoading,
+  isCsvUploading,
   onClose,
   onSettingsChange,
+  onLoadCsvFiles,
+  onUploadCsv,
 }: Readonly<BacktestSettingsPanelProps>) {
   useScrollLock(isOpen);
 
@@ -47,6 +59,14 @@ export function BacktestSettingsPanel({
       globalThis.window.removeEventListener("keydown", handleEscape);
     };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    void onLoadCsvFiles();
+  }, [isOpen, onLoadCsvFiles]);
 
   if (!isOpen) {
     return null;
@@ -76,72 +96,146 @@ export function BacktestSettingsPanel({
           </div>
 
           <div className="space-y-4">
-            <label className="block">
-              <span className="mb-1.5 block text-sm text-muted-foreground">Symbol</span>
-              <input
-                value={settings.symbol}
-                onChange={(event) =>
-                  onSettingsChange({
-                    ...settings,
-                    symbol: event.target.value.toUpperCase(),
-                  })
-                }
-                className={SETTINGS_FIELD_CLASS_NAME}
-                placeholder="AAPL"
-              />
-            </label>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-sm text-muted-foreground">Start Date</span>
-                <input
-                  type="date"
-                  value={settings.startDate}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      ...settings,
-                      startDate: event.target.value,
-                    })
-                  }
-                  className={SETTINGS_FIELD_CLASS_NAME}
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-sm text-muted-foreground">End Date</span>
-                <input
-                  type="date"
-                  value={settings.endDate}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      ...settings,
-                      endDate: event.target.value,
-                    })
-                  }
-                  className={SETTINGS_FIELD_CLASS_NAME}
-                />
-              </label>
+            <div>
+              <span className="mb-1.5 block text-sm text-muted-foreground">Source</span>
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/80 bg-background/80 p-1">
+                {(["yahoo", "csv"] as const).map((source) => (
+                  <button
+                    key={source}
+                    type="button"
+                    className={`h-9 rounded-md text-sm font-medium transition-colors ${
+                      settings.dataSource === source
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                    onClick={() =>
+                      onSettingsChange({
+                        ...settings,
+                        dataSource: source,
+                        csvFilename: source === "csv" && !settings.csvFilename && csvFiles.length > 0 ? csvFiles[0] : settings.csvFilename,
+                      })
+                    }
+                  >
+                    {source === "yahoo" ? "Yahoo" : "CSV"}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm text-muted-foreground">Timeframe</span>
-              <select
-                value={settings.interval}
-                onChange={(event) =>
-                  onSettingsChange({
-                    ...settings,
-                    interval: event.target.value,
-                  })
-                }
-                className={SETTINGS_FIELD_CLASS_NAME}
-              >
-                {TIMEFRAME_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {settings.dataSource === "yahoo" ? (
+              <>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm text-muted-foreground">Symbol</span>
+                  <input
+                    value={settings.symbol}
+                    onChange={(event) =>
+                      onSettingsChange({
+                        ...settings,
+                        symbol: event.target.value.toUpperCase(),
+                      })
+                    }
+                    className={SETTINGS_FIELD_CLASS_NAME}
+                    placeholder="AAPL"
+                  />
+                </label>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm text-muted-foreground">Start Date</span>
+                    <input
+                      type="date"
+                      value={settings.startDate}
+                      onChange={(event) =>
+                        onSettingsChange({
+                          ...settings,
+                          startDate: event.target.value,
+                        })
+                      }
+                      className={SETTINGS_FIELD_CLASS_NAME}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm text-muted-foreground">End Date</span>
+                    <input
+                      type="date"
+                      value={settings.endDate}
+                      onChange={(event) =>
+                        onSettingsChange({
+                          ...settings,
+                          endDate: event.target.value,
+                        })
+                      }
+                      className={SETTINGS_FIELD_CLASS_NAME}
+                    />
+                  </label>
+                </div>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-sm text-muted-foreground">Timeframe</span>
+                  <select
+                    value={settings.interval}
+                    onChange={(event) =>
+                      onSettingsChange({
+                        ...settings,
+                        interval: event.target.value,
+                      })
+                    }
+                    className={SETTINGS_FIELD_CLASS_NAME}
+                  >
+                    {TIMEFRAME_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm text-muted-foreground">CSV File</span>
+                  <select
+                    value={settings.csvFilename}
+                    onChange={(event) =>
+                      onSettingsChange({
+                        ...settings,
+                        csvFilename: event.target.value,
+                      })
+                    }
+                    className={SETTINGS_FIELD_CLASS_NAME}
+                    disabled={isCsvFilesLoading || csvFiles.length === 0}
+                  >
+                    <option value="">{isCsvFilesLoading ? "Loading CSV files..." : "Select a CSV file"}</option>
+                    {csvFiles.map((filename) => (
+                      <option key={filename} value={filename}>
+                        {filename}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border/90 bg-background/70 px-3 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/70">
+                  <Upload className="h-4 w-4" />
+                  <span>{isCsvUploading ? "Uploading..." : "Upload CSV"}</span>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="sr-only"
+                    disabled={isCsvUploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file) {
+                        void onUploadCsv(file);
+                      }
+                    }}
+                  />
+                </label>
+
+                {csvFilesError ? <p className="text-sm text-destructive">{csvFilesError}</p> : null}
+              </div>
+            )}
 
             <label className="block">
               <span className="mb-1.5 block text-sm text-muted-foreground">Initial Balance</span>
