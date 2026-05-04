@@ -13,7 +13,8 @@ from zstar.api.backtest.models import ValidateStrategiesResponse, ValidationIssu
 from zstar.api.start_backend import app
 
 backtest_router_module = importlib.import_module("zstar.api.backtest.backtest_router")
-file_utils_module = importlib.import_module("zstar.api.utils.file_utils")
+strategy_file_utils_module = importlib.import_module("zstar.api.utils.strategy_file_utils")
+csv_file_utils_module = importlib.import_module("zstar.api.utils.csv_file_utils")
 client = TestClient(app)
 
 class SimpleStrategy(CoreStrategy):
@@ -160,7 +161,7 @@ def test_csv_files_endpoint_returns_csv_filenames(monkeypatch, tmp_path):
     (data_dir / "notes.txt").write_text("ignore", encoding="utf-8")
     (data_dir / "beta.CSV").write_text("date,open,high,low,close,volume\n", encoding="utf-8")
 
-    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", data_dir))
+    monkeypatch.setattr(csv_file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", data_dir))
 
     response = client.get("/api/backtest/csv-files")
 
@@ -171,7 +172,7 @@ def test_csv_files_endpoint_returns_csv_filenames(monkeypatch, tmp_path):
 def test_csv_upload_endpoint_saves_csv_file(monkeypatch, tmp_path):
     data_dir = tmp_path / "Data"
 
-    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", data_dir))
+    monkeypatch.setattr(csv_file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", data_dir))
 
     response = client.post(
         "/api/backtest/csv-files",
@@ -184,7 +185,7 @@ def test_csv_upload_endpoint_saves_csv_file(monkeypatch, tmp_path):
 
 
 def test_csv_upload_endpoint_rejects_non_csv_file(monkeypatch, tmp_path):
-    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", tmp_path / "Data"))
+    monkeypatch.setattr(csv_file_utils_module, "load_config", lambda: _FakeConfig(tmp_path / "strategies", tmp_path / "Data"))
 
     response = client.post(
         "/api/backtest/csv-files",
@@ -234,7 +235,7 @@ def test_list_strategies_returns_python_filenames_without_extension(monkeypatch,
     (strategy_dir / "nested").mkdir()
     (strategy_dir / "nested" / "child.py").write_text("print('nested')", encoding="utf-8")
 
-    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
+    monkeypatch.setattr(strategy_file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
 
     response = client.get("/api/strategies")
 
@@ -256,7 +257,7 @@ class AlphaStrategy(CoreStrategy):
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
+    monkeypatch.setattr(strategy_file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
 
     response = client.post("/api/validate-strategies", json={"strategy_filename": "alpha"})
 
@@ -282,7 +283,7 @@ class BrokenStrategy(CoreStrategy):
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
+    monkeypatch.setattr(strategy_file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
 
     response = client.post("/api/validate-strategies", json={"strategy_filename": "broken"})
 
@@ -320,7 +321,7 @@ def test_run_backtest_uses_selected_strategy_filename(monkeypatch, tmp_path):
     (strategy_dir / "alpha_strategy.py").write_text("class Placeholder: pass", encoding="utf-8")
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
-    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
+    monkeypatch.setattr(strategy_file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
     monkeypatch.setattr(
         backtest_router_module,
         "resolve_strategy_validation",
@@ -355,7 +356,7 @@ def test_run_backtest_defaults_to_default_strategy_when_filename_missing(monkeyp
     (strategy_dir / "default_strategy.py").write_text("class Placeholder: pass", encoding="utf-8")
 
     monkeypatch.setattr(backtest_router_module, "YahooData", _FakeYahooData)
-    monkeypatch.setattr(file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
+    monkeypatch.setattr(strategy_file_utils_module, "load_config", lambda: _FakeConfig(strategy_dir))
     monkeypatch.setattr(
         backtest_router_module,
         "resolve_strategy_validation",

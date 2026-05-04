@@ -8,6 +8,7 @@ import { KpiTable } from "@/components/organisms/backtest/KpiTable";
 import { MarketOhlcvChart } from "@/components/organisms/backtest/MarketOhlcvChart";
 import { RecentTradesTable } from "@/components/organisms/backtest/RecentTradesTable";
 import type {
+  BacktestRunResponse,
   BacktestRunStatus,
   BacktestSettings,
   EquityPoint,
@@ -28,6 +29,7 @@ interface DashboardPanelProps {
   readonly runStatus: BacktestRunStatus | null;
   readonly validationResult: StrategyValidationResult | null;
   readonly isValidating: boolean;
+  readonly backtestResult: BacktestRunResponse | null;
   readonly selectedStrategy: string;
   readonly settings: BacktestSettings;
   readonly themeMode: ThemeMode;
@@ -56,14 +58,30 @@ export const DashboardPanel = memo(function DashboardPanel({
   runStatus,
   validationResult,
   isValidating,
+  backtestResult,
   selectedStrategy,
   settings,
   themeMode,
 }: Readonly<DashboardPanelProps>) {
-  const symbol = settings.symbol.trim().toUpperCase() || "—";
-  const interval = settings.interval.trim() || "—";
-  const startDate = formatHeroDate(settings.startDate);
-  const endDate = formatHeroDate(settings.endDate);
+  const csvMeta = backtestResult?.meta ?? null;
+  const yahooSymbol = settings.symbol.trim().toUpperCase() || "—";
+  const yahooInterval = settings.interval.trim() || "—";
+  const yahooStartDate = formatHeroDate(settings.startDate);
+  const yahooEndDate = formatHeroDate(settings.endDate);
+  const csvStartDate = csvMeta ? formatHeroDate(csvMeta.start_date) : "—";
+  const csvEndDate = csvMeta ? formatHeroDate(csvMeta.end_date) : "—";
+  const csvInterval = csvMeta?.interval ?? "—";
+  const csvFilename = settings.csvFilename || "—";
+  const heroSourceLine =
+    settings.dataSource === "csv"
+      ? `CSV - ${csvFilename}`
+      : `Yahoo - API - ${yahooSymbol} - ${yahooInterval}`;
+  const heroDateLine =
+    settings.dataSource === "csv"
+      ? csvMeta
+        ? `${csvInterval} - ${csvStartDate} - ${csvEndDate}`
+        : "Run a CSV backtest to display timeframe and date range"
+      : `${yahooStartDate} - ${yahooEndDate}`;
 
   const firstValidationIssue =
     validationResult && !validationResult.ready_to_backtest && validationResult.issues.length > 0
@@ -149,10 +167,10 @@ export const DashboardPanel = memo(function DashboardPanel({
               Backtest
             </h2>
             <p className="hero-line-animation-delay-1 mt-5 text-base font-medium tracking-wide text-foreground/85 sm:text-lg">
-              {symbol} - {interval}
+              {heroSourceLine}
             </p>
             <p className="hero-line-animation-delay-2 mt-1 text-sm tracking-wide text-muted-foreground sm:text-base">
-              {startDate} - {endDate}
+              {heroDateLine}
             </p>
             {heroState ? (
               <div

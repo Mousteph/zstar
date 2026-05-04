@@ -95,6 +95,7 @@ export function BacktestWorkbench() {
       runStatus={runStatus}
       validationResult={validationResult}
       isValidating={isValidating}
+      backtestResult={backtestResult}
       selectedStrategy={selectedStrategy}
       settings={settings}
       themeMode={themeMode}
