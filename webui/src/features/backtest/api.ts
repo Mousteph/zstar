@@ -38,7 +38,7 @@ export async function runBacktest(payload: BacktestRunRequest): Promise<Backtest
     throw new Error("Invalid run backtest response payload.");
   }
 
-  return responseJson as BacktestRunEnvelopeResponse;
+  return responseJson;
 }
 
 export async function fetchStrategies(): Promise<string[]> {
@@ -76,11 +76,7 @@ export async function checkStrategyCode(payload: ValidateStrategyRequest): Promi
     body: JSON.stringify(payload),
   });
 
-  const responseJson = (await response.json()) as
-    | StrategyValidationResult
-    | {
-        detail?: string;
-      };
+  const responseJson = (await response.json()) as StrategyValidationResult;
 
   if (!response.ok) {
     const detail =
@@ -99,7 +95,7 @@ export async function checkStrategyCode(payload: ValidateStrategyRequest): Promi
     throw new Error("Invalid strategy validation response payload.");
   }
 
-  return responseJson as StrategyValidationResult;
+  return responseJson;
 }
 
 export async function fetchCsvFiles(): Promise<string[]> {

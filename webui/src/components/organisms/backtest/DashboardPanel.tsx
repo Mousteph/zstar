@@ -75,13 +75,12 @@ export const DashboardPanel = memo(function DashboardPanel({
   const heroSourceLine =
     settings.dataSource === "csv"
       ? `CSV - ${csvFilename}`
-      : `Yahoo - API - ${yahooSymbol} - ${yahooInterval}`;
+      : `Yahoo API - ${yahooSymbol} - ${yahooInterval}`;
+  const csvDateLine = csvMeta
+    ? `${csvInterval} - ${csvStartDate} - ${csvEndDate}`
+    : "Run a CSV backtest to display timeframe and date range";
   const heroDateLine =
-    settings.dataSource === "csv"
-      ? csvMeta
-        ? `${csvInterval} - ${csvStartDate} - ${csvEndDate}`
-        : "Run a CSV backtest to display timeframe and date range"
-      : `${yahooStartDate} - ${yahooEndDate}`;
+    settings.dataSource === "csv" ? csvDateLine : `${yahooStartDate} - ${yahooEndDate}`;
 
   const firstValidationIssue =
     validationResult && !validationResult.ready_to_backtest && validationResult.issues.length > 0

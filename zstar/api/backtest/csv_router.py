@@ -1,5 +1,5 @@
 import shutil
-
+from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from zstar.api.utils import ensure_data_dir, list_csv_filenames, normalize_csv_filename
@@ -17,7 +17,7 @@ def get_csv_files() -> CsvFilesListResponse:
 
 
 @router.post("/csv-files")
-def upload_csv_file(file: UploadFile = File(...)) -> CsvFileUploadResponse:
+def upload_csv_file(file: Annotated[UploadFile, File(...)]) -> CsvFileUploadResponse:
     try:
         filename = normalize_csv_filename(file.filename or "")
         destination = ensure_data_dir() / filename
