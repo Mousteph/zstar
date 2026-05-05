@@ -126,25 +126,21 @@ def build_backtest_meta(
 def safe_number(value: Any) -> Optional[float | str]:
     if value is None:
         return None
+    
     if isinstance(value, str):
         return value
+    
     if isinstance(value, (np.floating, float)):
         numeric = float(value)
         if math.isnan(numeric) or math.isinf(numeric):
             return None
         return numeric
+
     if isinstance(value, (np.integer, int)):
         return float(value)
+    
     return str(value)
 
 
 def timestamp_to_iso(value: pd.Timestamp | datetime) -> str:
-    if isinstance(value, pd.Timestamp):
-        if value.tzinfo is None:
-            return value.tz_localize("UTC").isoformat()
-        return value.tz_convert("UTC").isoformat()
-
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc).isoformat()
-
-    return value.astimezone(timezone.utc).isoformat()
+    return value.isoformat()

@@ -14,12 +14,22 @@ import type { Trade } from "@/types/backtest";
 
 interface RecentTradesTableProps {
   readonly trades: Trade[];
+  readonly selectedTradeId: string | null;
+  readonly onSelectedTradeIdChange: (tradeId: string | null) => void;
 }
 
-export function RecentTradesTable({ trades }: Readonly<RecentTradesTableProps>) {
+export function RecentTradesTable({
+  trades,
+  selectedTradeId,
+  onSelectedTradeIdChange,
+}: Readonly<RecentTradesTableProps>) {
   const sortedTrades = [...trades].sort(
     (a, b) => new Date(b.exit_datetime).getTime() - new Date(a.exit_datetime).getTime(),
   );
+
+  const toggleSelectedTrade = (tradeId: string) => {
+    onSelectedTradeIdChange(selectedTradeId === tradeId ? null : tradeId);
+  };
 
   return (
     <section className="border-b border-border/80 px-2 pb-10 sm:px-4 lg:px-6">
@@ -45,23 +55,48 @@ export function RecentTradesTable({ trades }: Readonly<RecentTradesTableProps>) 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedTrades.map((trade, index) => (
-              <TableRow key={trade.id} className={getTradeRowClassName(index)}>
-                <TableCell className="py-3 text-[0.94rem] font-medium">{formatDateTime(trade.entry_datetime)}</TableCell>
-                <TableCell className="py-3 text-[0.94rem]">{formatDateTime(trade.exit_datetime)}</TableCell>
-                <TableCell className="py-3 text-[0.94rem]">{trade.symbol}</TableCell>
-                <TableCell className="py-3">
-                  <span className={getTradeSideBadgeClassName(trade.side)}>{trade.side}</span>
-                </TableCell>
-                <TableCell className="py-3 text-right text-[0.94rem]">{formatNumber(trade.size)}</TableCell>
-                <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.entry_price)}</TableCell>
-                <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.exit_price)}</TableCell>
-                <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.total_fees)}</TableCell>
-                <TableCell className={`${getTradePnlClassName(trade.net_pnl)} py-3 text-[0.94rem]`}>
-                  {formatCurrency(trade.net_pnl)}
-                </TableCell>
-              </TableRow>
-            ))}
+            {sortedTrades.map((trade, index) => {
+              const isSelected = selectedTradeId === trade.id;
+
+              return (
+                <TableRow
+                  key={trade.id}
+                  className={[
+                    getTradeRowClassName(index),
+                    "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    isSelected ? "bg-emerald-500/10 ring-1 ring-emerald-400/40 hover:bg-emerald-500/15" : "",
+                    selectedTradeId && !isSelected ? "opacity-45 hover:opacity-70" : "",
+                  ].join(" ")}
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  role="button"
+                  title={isSelected ? "Show all trades on the chart" : "Show only this trade on the chart"}
+                  onClick={() => toggleSelectedTrade(trade.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      toggleSelectedTrade(trade.id);
+                    }
+                  }}
+                >
+                  <TableCell className="py-3 text-[0.94rem] font-medium">
+                    {formatDateTime(trade.entry_datetime)}
+                  </TableCell>
+                  <TableCell className="py-3 text-[0.94rem]">{formatDateTime(trade.exit_datetime)}</TableCell>
+                  <TableCell className="py-3 text-[0.94rem]">{trade.symbol}</TableCell>
+                  <TableCell className="py-3">
+                    <span className={getTradeSideBadgeClassName(trade.side)}>{trade.side}</span>
+                  </TableCell>
+                  <TableCell className="py-3 text-right text-[0.94rem]">{formatNumber(trade.size)}</TableCell>
+                  <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.entry_price)}</TableCell>
+                  <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.exit_price)}</TableCell>
+                  <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.total_fees)}</TableCell>
+                  <TableCell className={`${getTradePnlClassName(trade.net_pnl)} py-3 text-[0.94rem]`}>
+                    {formatCurrency(trade.net_pnl)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       ) : null}

@@ -5,9 +5,11 @@ import { Maximize2, Minimize2, Minus, Plus, RotateCcw } from "lucide-react";
 import {
   ColorType,
   createChart,
+  type BarData,
   type CandlestickData,
   type HistogramData,
   type IChartApi,
+  type MouseEventParams,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
@@ -15,6 +17,7 @@ import {
 
 import { ActionIconButton } from "@/components/molecules/ActionIconButton";
 import { ExpandableSection } from "@/components/molecules/ExpandableSection";
+import { formatCurrency, formatDateTime, formatNumber } from "@/features/backtest/utils";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { readCssVariable } from "@/lib/dom/readCssVariable";
 import { cn } from "@/lib/utils";
@@ -37,6 +40,20 @@ interface MarketOhlcvChartProps {
 interface PreparedMarketData {
   readonly candles: CandlestickData[];
   readonly volumes: HistogramData[];
+  readonly volumeByTime: Map<number, number>;
+}
+
+interface TradeEvent {
+  readonly type: "entry" | "exit";
+  readonly trade: Trade;
+}
+
+interface CandleTooltipState {
+  readonly left: number;
+  readonly top: number;
+  readonly candle: CandlestickData;
+  readonly volume: number | null;
+  readonly tradeEvents: TradeEvent[];
 }
 
 interface ChartPalette {
@@ -83,6 +100,7 @@ function prepareMarketData(data: MarketOhlcvPoint[], palette: ChartPalette): Pre
 
   const candles: CandlestickData[] = [];
   const volumes: HistogramData[] = [];
+  const volumeByTime = new Map<number, number>();
   let lastTime: number | null = null;
 
   for (const point of sortedData) {
@@ -119,12 +137,40 @@ function prepareMarketData(data: MarketOhlcvPoint[], palette: ChartPalette): Pre
         value: point.volume,
         color: point.close >= point.open ? palette.volumeUpColor : palette.volumeDownColor,
       });
+      volumeByTime.set(numericTime, point.volume);
     }
 
     lastTime = numericTime;
   }
 
-  return { candles, volumes };
+  return { candles, volumes, volumeByTime };
+}
+
+function buildTradeEventsByTime(trades: Trade[]): Map<number, TradeEvent[]> {
+  const eventsByTime = new Map<number, TradeEvent[]>();
+
+  for (const trade of trades) {
+    const entryTime = parseTimestamp(trade.entry_datetime);
+    const exitTime = parseTimestamp(trade.exit_datetime);
+
+    if (entryTime !== null) {
+      const numericEntryTime = Number(entryTime);
+      eventsByTime.set(numericEntryTime, [
+        ...(eventsByTime.get(numericEntryTime) ?? []),
+        { type: "entry", trade },
+      ]);
+    }
+
+    if (exitTime !== null) {
+      const numericExitTime = Number(exitTime);
+      eventsByTime.set(numericExitTime, [
+        ...(eventsByTime.get(numericExitTime) ?? []),
+        { type: "exit", trade },
+      ]);
+    }
+  }
+
+  return eventsByTime;
 }
 
 function buildTradeMarkers(trades: Trade[], palette: ChartPalette): SeriesMarker<Time>[] {
@@ -175,10 +221,12 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
   const [barSpacing, setBarSpacing] = useState(DEFAULT_BAR_SPACING);
   const [chartInitError, setChartInitError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [tooltipState, setTooltipState] = useState<CandleTooltipState | null>(null);
 
   const palette = useMemo(() => getChartPalette(), [themeMode, isExpanded]);
   const preparedData = useMemo(() => prepareMarketData(data, palette), [data, palette]);
   const tradeMarkers = useMemo(() => buildTradeMarkers(trades, palette), [trades, palette]);
+  const tradeEventsByTime = useMemo(() => buildTradeEventsByTime(trades), [trades]);
 
   useScrollLock(isExpanded);
 
@@ -211,6 +259,7 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
     volumeSeriesRef.current = null;
 
     let cleanupResize: (() => void) | null = null;
+    let cleanupCrosshair: (() => void) | null = null;
     let animationFrameA: number | null = null;
     let animationFrameB: number | null = null;
 
@@ -277,6 +326,44 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
 
       setChartInitError(null);
 
+      const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+        if (!param.point || param.time === undefined) {
+          setTooltipState(null);
+          return;
+        }
+
+        const candle = param.seriesData.get(candlestickSeries) as BarData<Time> | undefined;
+        if (!candle || !("open" in candle)) {
+          setTooltipState(null);
+          return;
+        }
+
+        const numericTime = Number(param.time);
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        const tooltipWidth = 190;
+        const tooltipHeight = 192;
+        const preferredLeft = param.point.x + 14;
+        const preferredTop = param.point.y + 14;
+
+        setTooltipState({
+          left: Math.min(Math.max(preferredLeft, 8), Math.max(containerWidth - tooltipWidth - 8, 8)),
+          top: Math.min(Math.max(preferredTop, 8), Math.max(containerHeight - tooltipHeight - 8, 8)),
+          candle: {
+            time: candle.time,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+          },
+          volume: preparedData.volumeByTime.get(numericTime) ?? null,
+          tradeEvents: tradeEventsByTime.get(numericTime) ?? [],
+        });
+      };
+
+      chart.subscribeCrosshairMove(handleCrosshairMove);
+      cleanupCrosshair = () => chart.unsubscribeCrosshairMove(handleCrosshairMove);
+
       const applyCurrentSize = () => {
         const rect = container.getBoundingClientRect();
         chart.applyOptions({
@@ -327,12 +414,14 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
         cancelAnimationFrame(animationFrameB);
       }
       cleanupResize?.();
+      cleanupCrosshair?.();
+      setTooltipState(null);
       chartRef.current?.remove();
       chartRef.current = null;
       candlestickSeriesRef.current = null;
       volumeSeriesRef.current = null;
     };
-  }, [isExpanded, palette]);
+  }, [isExpanded, palette, preparedData.volumeByTime, tradeEventsByTime]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -423,9 +512,53 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
         </p>
       ) : null}
       <div
-        ref={isExpanded ? expandedContainerRef : inlineContainerRef}
-        className={cn("w-full", isExpanded ? "min-h-[420px] flex-1" : "h-[440px]")}
-      />
+        className={cn("relative w-full", isExpanded ? "min-h-[420px] flex-1" : "h-[440px]")}
+      >
+        <div
+          ref={isExpanded ? expandedContainerRef : inlineContainerRef}
+          className="h-full w-full"
+        />
+        {tooltipState ? (
+          <div
+            className="pointer-events-none absolute z-10 w-[190px] rounded-md border border-border/80 bg-background/90 px-3 py-2 text-xs text-foreground shadow-xl backdrop-blur-md"
+            style={{ left: tooltipState.left, top: tooltipState.top }}
+          >
+            <p className="mb-1 truncate text-[0.68rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              {typeof tooltipState.candle.time === "number"
+                ? formatDateTime(new Date(tooltipState.candle.time * 1000).toISOString())
+                : String(tooltipState.candle.time)}
+            </p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <span className="text-muted-foreground">Open</span>
+              <span className="text-right tabular-nums">{formatCurrency(tooltipState.candle.open)}</span>
+              <span className="text-muted-foreground">Close</span>
+              <span className="text-right tabular-nums">{formatCurrency(tooltipState.candle.close)}</span>
+              <span className="text-muted-foreground">Low</span>
+              <span className="text-right tabular-nums">{formatCurrency(tooltipState.candle.low)}</span>
+              <span className="text-muted-foreground">High</span>
+              <span className="text-right tabular-nums">{formatCurrency(tooltipState.candle.high)}</span>
+              <span className="text-muted-foreground">Volume</span>
+              <span className="text-right tabular-nums">
+                {tooltipState.volume === null ? "N/A" : formatNumber(tooltipState.volume)}
+              </span>
+            </div>
+            {tooltipState.tradeEvents.length > 0 ? (
+              <div className="mt-2 border-t border-border/70 pt-2">
+                {tooltipState.tradeEvents.map((event) => (
+                  <div key={`${event.trade.id}-${event.type}`} className="flex items-center justify-between gap-2">
+                    <span className={event.type === "entry" ? "text-emerald-400" : "text-amber-400"}>
+                      {event.type === "entry" ? "Entry" : "Exit"}
+                    </span>
+                    <span className="text-right tabular-nums">
+                      {formatCurrency(event.type === "entry" ? event.trade.entry_price : event.trade.exit_price)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </ExpandableSection>
   );
 }
