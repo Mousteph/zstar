@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from zstar.api.backtest import backtest_router, strategy_router
+from zstar.api.backtest import backtest_router, csv_router, strategy_router
 from zstar.config import AppConfig, load_config
 from zstar.logger import clear_log_context, get_logger, set_log_context, setup_logging
 
@@ -32,6 +32,7 @@ def create_app(settings: AppConfig | None = None, *, configure_logging: bool = T
     )
 
     application.include_router(backtest_router)
+    application.include_router(csv_router)
     application.include_router(strategy_router)
 
     @application.middleware("http")

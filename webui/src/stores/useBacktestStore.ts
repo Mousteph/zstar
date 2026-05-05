@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { checkStrategyCode, runBacktest } from "@/features/backtest/api";
+import { checkStrategyCode, fetchCsvFiles, runBacktest, uploadCsvFile } from "@/features/backtest/api";
 import { defaultBacktestSettings } from "@/features/backtest/defaults";
 import type {
   BacktestRunResponse,
@@ -14,9 +14,15 @@ interface BacktestState {
   isValidating: boolean;
   settings: BacktestSettings;
   backtestResult: BacktestRunResponse | null;
+  csvFiles: string[];
+  csvFilesError: string | null;
+  isCsvFilesLoading: boolean;
+  isCsvUploading: boolean;
   runStatus: BacktestRunStatus | null;
   validationResult: StrategyValidationResult | null;
   setSettings: (settings: BacktestSettings) => void;
+  loadCsvFiles: () => Promise<void>;
+  uploadCsv: (file: File) => Promise<void>;
   runValidation: (strategyFilename?: string) => Promise<StrategyValidationResult | null>;
   runCurrentBacktest: (strategyFilename?: string) => Promise<void>;
 }
@@ -26,12 +32,60 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
   isValidating: false,
   settings: defaultBacktestSettings,
   backtestResult: null,
+  csvFiles: [],
+  csvFilesError: null,
+  isCsvFilesLoading: false,
+  isCsvUploading: false,
   runStatus: null,
   validationResult: null,
   setSettings: (settings) =>
     set({
       settings,
     }),
+  loadCsvFiles: async () => {
+    set({ isCsvFilesLoading: true, csvFilesError: null });
+
+    try {
+      const csvFiles = await fetchCsvFiles();
+      set((state) => ({
+        csvFiles,
+        settings:
+          state.settings.dataSource === "csv" && !state.settings.csvFilename && csvFiles.length > 0
+            ? {
+                ...state.settings,
+                csvFilename: csvFiles[0],
+              }
+            : state.settings,
+      }));
+    } catch (error) {
+      set({
+        csvFilesError: error instanceof Error ? error.message : "Unable to fetch CSV files.",
+      });
+    } finally {
+      set({ isCsvFilesLoading: false });
+    }
+  },
+  uploadCsv: async (file) => {
+    set({ isCsvUploading: true, csvFilesError: null });
+
+    try {
+      const response = await uploadCsvFile(file);
+      set((state) => ({
+        csvFiles: response.files,
+        settings: {
+          ...state.settings,
+          dataSource: "csv",
+          csvFilename: response.filename,
+        },
+      }));
+    } catch (error) {
+      set({
+        csvFilesError: error instanceof Error ? error.message : "Unable to upload CSV file.",
+      });
+    } finally {
+      set({ isCsvUploading: false });
+    }
+  },
   runValidation: async (strategyFilename) => {
     set({ isValidating: true, runStatus: null });
 
@@ -71,12 +125,19 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
 
     try {
       const response = await runBacktest({
-        data: {
-          symbol: settings.symbol,
-          start_date: settings.startDate,
-          end_date: settings.endDate,
-          interval: settings.interval,
-        },
+        data:
+          settings.dataSource === "csv"
+            ? {
+                source: "csv",
+                filename: settings.csvFilename,
+              }
+            : {
+                source: "yahoo",
+                symbol: settings.symbol,
+                start_date: settings.startDate,
+                end_date: settings.endDate,
+                interval: settings.interval,
+              },
         ...(strategyFilename ? { strategy_filename: strategyFilename } : {}),
         backtest_config: {
           initial_balance: settings.initialBalance,

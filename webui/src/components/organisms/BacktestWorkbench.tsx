@@ -36,11 +36,17 @@ export function BacktestWorkbench() {
   const {
     isRunning,
     isValidating,
+    csvFiles,
+    csvFilesError,
+    isCsvFilesLoading,
+    isCsvUploading,
     settings,
     backtestResult,
     runStatus,
     validationResult,
     setSettings,
+    loadCsvFiles,
+    uploadCsv,
     runValidation,
     runCurrentBacktest,
   } = useBacktestStore();
@@ -89,6 +95,7 @@ export function BacktestWorkbench() {
       runStatus={runStatus}
       validationResult={validationResult}
       isValidating={isValidating}
+      backtestResult={backtestResult}
       selectedStrategy={selectedStrategy}
       settings={settings}
       themeMode={themeMode}
@@ -136,7 +143,13 @@ export function BacktestWorkbench() {
       <BacktestSettingsPanel
         isOpen={isSettingsOpen}
         settings={settings}
+        csvFiles={csvFiles}
+        csvFilesError={csvFilesError}
+        isCsvFilesLoading={isCsvFilesLoading}
+        isCsvUploading={isCsvUploading}
         onSettingsChange={setSettings}
+        onLoadCsvFiles={loadCsvFiles}
+        onUploadCsv={uploadCsv}
         onClose={closeSettings}
       />
     </div>
