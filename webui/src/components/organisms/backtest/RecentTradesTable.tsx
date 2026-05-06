@@ -50,6 +50,9 @@ export function RecentTradesTable({
               <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Size</TableHead>
               <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Entry</TableHead>
               <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Exit</TableHead>
+              <TableHead className="h-11 py-2 text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Reason</TableHead>
+              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Stop Loss</TableHead>
+              <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Take Profit</TableHead>
               <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Fees</TableHead>
               <TableHead className="h-11 py-2 text-right text-[0.74rem] uppercase tracking-[0.16em] text-muted-foreground">Net PnL</TableHead>
             </TableRow>
@@ -90,6 +93,15 @@ export function RecentTradesTable({
                   <TableCell className="py-3 text-right text-[0.94rem]">{formatNumber(trade.size)}</TableCell>
                   <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.entry_price)}</TableCell>
                   <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.exit_price)}</TableCell>
+                  <TableCell className="py-3 text-[0.94rem] capitalize">
+                    {trade.exit_reason.replaceAll("_", " ")}
+                  </TableCell>
+                  <TableCell className="py-3 text-right text-[0.94rem]">
+                    {trade.stop_loss_price === null ? "N/A" : formatCurrency(trade.stop_loss_price)}
+                  </TableCell>
+                  <TableCell className="py-3 text-right text-[0.94rem]">
+                    {trade.take_profit_price === null ? "N/A" : formatCurrency(trade.take_profit_price)}
+                  </TableCell>
                   <TableCell className="py-3 text-right text-[0.94rem]">{formatCurrency(trade.total_fees)}</TableCell>
                   <TableCell className={`${getTradePnlClassName(trade.net_pnl)} py-3 text-[0.94rem]`}>
                     {formatCurrency(trade.net_pnl)}

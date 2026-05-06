@@ -148,6 +148,9 @@ def test_run_backtest_returns_complete_payload(monkeypatch):
     assert len(body["backtest_result"]["trades"]) == 1
     assert body["backtest_result"]["trades"][0]["symbol"] == "AAPL"
     assert body["backtest_result"]["trades"][0]["side"] == "LONG"
+    assert "take_profit_price" in body["backtest_result"]["trades"][0]
+    assert "stop_loss_price" in body["backtest_result"]["trades"][0]
+    assert "exit_reason" in body["backtest_result"]["trades"][0]
     assert "total_return_pct" in body["backtest_result"]["kpis"]
     assert "sharpe_ratio" in body["backtest_result"]["kpis"]
     assert "best_trade" in body["backtest_result"]["kpis"]

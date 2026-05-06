@@ -62,6 +62,9 @@ def serialize_trades(trades: List[Trade], symbol: str) -> List[TradeResponse]:
             size=float(trade.size),
             entry_price=float(trade.entry_price),
             exit_price=float(trade.exit_price),
+            take_profit_price=safe_number(trade.take_profit_price),
+            stop_loss_price=safe_number(trade.stop_loss_price),
+            exit_reason=trade.exit_reason,
             entry_datetime=timestamp_to_iso(trade.entry_datetime),
             exit_datetime=timestamp_to_iso(trade.exit_datetime),
             raw_pnl=float(trade.raw_pnl),
@@ -78,8 +81,8 @@ def serialize_equity_curve(report: BacktestReport) -> List[EquityPointResponse]:
         rows.append(
             EquityPointResponse(
                 datetime=timestamp_to_iso(row.Index),
-                strategy=safe_number(row.strategy),  # type: ignore[arg-type]
-                buy_and_hold=safe_number(row.buy_and_hold),  # type: ignore[arg-type]
+                strategy=safe_number(row.strategy),
+                buy_and_hold=safe_number(row.buy_and_hold),
             )
         )
 
@@ -143,4 +146,5 @@ def safe_number(value: Any) -> Optional[float | str]:
 
 
 def timestamp_to_iso(value: pd.Timestamp | datetime) -> str:
-    return value.isoformat()
+    timestamp = pd.Timestamp(value)
+    return timestamp.isoformat()

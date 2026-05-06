@@ -38,8 +38,23 @@ class MovingAverageCrossStrategy(CoreStrategy):
     def short_exit_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         data["short_exit"] = np.zeros(len(data), dtype=int)
         return data
+    
+    # def long_take_profit_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+    #     data["long_take_profit"] = (
+    #         data["long_sma"] * 1.4
+    #     )
+
+    #     return data
+
+    def long_stop_loss_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        data["long_stop_loss"] = (
+            data["long_sma"] * 0.97
+        )
+
+        return data
 
     def position_size(self, balance: float, entry_price: float) -> float:
+        return balance / entry_price
         if entry_price <= 0:
             return 0.0
 

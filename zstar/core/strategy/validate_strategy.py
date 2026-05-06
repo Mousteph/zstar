@@ -46,6 +46,7 @@ class ValidationResult:
 
 class ValidateStrategy:
     required_signal_columns = ["long_entry", "short_entry", "long_exit", "short_exit"]
+    risk_price_columns = ["long_take_profit", "short_take_profit", "long_stop_loss", "short_stop_loss"]
 
 
     def __init__(self, strategy_filename: Optional[str] = None, strategy_path: Optional[Path | str] = None):
@@ -232,6 +233,10 @@ class ValidateStrategy:
             data = strategy.short_entry_signals(data)
             data = strategy.long_exit_signals(data)
             data = strategy.short_exit_signals(data)
+            data = strategy.long_take_profit_signals(data)
+            data = strategy.short_take_profit_signals(data)
+            data = strategy.long_stop_loss_signals(data)
+            data = strategy.short_stop_loss_signals(data)
             return data, None
 
         except Exception as error:
@@ -251,6 +256,11 @@ class ValidateStrategy:
             signal_data = data[column_name]
             if not self._is_signal_dtype_valid(signal_data):
                 message = f"Signal column '{column_name}' must contain numeric or boolean values."
+                issues.append(ValidationIssue("type", self.strategy_filename, None, message))
+
+        for column_name in self.risk_price_columns:
+            if column_name in data.columns and not pd.api.types.is_numeric_dtype(data[column_name]):
+                message = f"Risk price column '{column_name}' must contain numeric values."
                 issues.append(ValidationIssue("type", self.strategy_filename, None, message))
 
         return issues
