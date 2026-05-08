@@ -156,7 +156,7 @@ def test_long_take_profit_closes_intrabar_at_take_profit_price():
         low_prices=[99.0, 98.0, 99.0],
         close_prices=[100.0, 100.0, 100.0],
     )
-    strategy = FixedSignalStrategy(size=1.0, long_entry_rows=[0], long_take_profit_prices={1: 110.0})
+    strategy = FixedSignalStrategy(size=1.0, long_entry_rows=[0], long_take_profit_prices={0: 110.0})
     report = _backtest_report(
         strategy=strategy,
         data=data,
@@ -183,7 +183,7 @@ def test_long_stop_loss_closes_intrabar_at_stop_loss_price():
         low_prices=[99.0, 90.0, 99.0],
         close_prices=[100.0, 100.0, 100.0],
     )
-    strategy = FixedSignalStrategy(size=1.0, long_entry_rows=[0], long_stop_loss_prices={1: 95.0})
+    strategy = FixedSignalStrategy(size=1.0, long_entry_rows=[0], long_stop_loss_prices={0: 95.0})
     report = _backtest_report(
         strategy=strategy,
         data=data,
@@ -209,7 +209,7 @@ def test_short_take_profit_closes_intrabar_at_take_profit_price():
         low_prices=[99.0, 85.0, 99.0],
         close_prices=[100.0, 100.0, 100.0],
     )
-    strategy = FixedSignalStrategy(size=1.0, short_entry_rows=[0], short_take_profit_prices={1: 90.0})
+    strategy = FixedSignalStrategy(size=1.0, short_entry_rows=[0], short_take_profit_prices={0: 90.0})
     report = _backtest_report(
         strategy=strategy,
         data=data,
@@ -235,7 +235,7 @@ def test_short_stop_loss_closes_intrabar_at_stop_loss_price():
         low_prices=[99.0, 98.0, 99.0],
         close_prices=[100.0, 100.0, 100.0],
     )
-    strategy = FixedSignalStrategy(size=1.0, short_entry_rows=[0], short_stop_loss_prices={1: 110.0})
+    strategy = FixedSignalStrategy(size=1.0, short_entry_rows=[0], short_stop_loss_prices={0: 110.0})
     report = _backtest_report(
         strategy=strategy,
         data=data,
@@ -264,8 +264,8 @@ def test_stop_loss_wins_when_stop_loss_and_take_profit_hit_same_candle():
     strategy = FixedSignalStrategy(
         size=1.0,
         long_entry_rows=[0],
-        long_take_profit_prices={1: 110.0},
-        long_stop_loss_prices={1: 95.0},
+        long_take_profit_prices={0: 110.0},
+        long_stop_loss_prices={0: 95.0},
     )
     report = _backtest_report(
         strategy=strategy,
@@ -284,7 +284,7 @@ def test_stop_loss_wins_when_stop_loss_and_take_profit_hit_same_candle():
     assert trade.net_pnl == pytest.approx(-5.0)
 
 
-def test_invalid_risk_prices_are_ignored_at_entry():
+def test_entry_is_cancelled_when_open_crosses_long_risk_prices():
     data = _price_frame(
         open_prices=[100.0, 100.0, 100.0],
         high_prices=[101.0, 120.0, 105.0],
@@ -294,8 +294,62 @@ def test_invalid_risk_prices_are_ignored_at_entry():
     strategy = FixedSignalStrategy(
         size=1.0,
         long_entry_rows=[0],
-        long_take_profit_prices={1: 90.0},
-        long_stop_loss_prices={1: 110.0},
+        long_take_profit_prices={0: 90.0},
+        long_stop_loss_prices={0: 110.0},
+    )
+    report = _backtest_report(
+        strategy=strategy,
+        data=data,
+        config={
+            'initial_balance': 1000.0,
+            'entry_fee_pct': 0.0,
+            'exit_fee_pct': 0.0,
+            'slippage_pct': 0.0,
+        },
+    )
+
+    assert report.trades == []
+
+
+def test_entry_is_cancelled_when_open_crosses_short_risk_prices():
+    data = _price_frame(
+        open_prices=[100.0, 100.0, 100.0],
+        high_prices=[101.0, 120.0, 105.0],
+        low_prices=[99.0, 80.0, 99.0],
+        close_prices=[100.0, 100.0, 105.0],
+    )
+    strategy = FixedSignalStrategy(
+        size=1.0,
+        short_entry_rows=[0],
+        short_take_profit_prices={0: 110.0},
+        short_stop_loss_prices={0: 90.0},
+    )
+    report = _backtest_report(
+        strategy=strategy,
+        data=data,
+        config={
+            'initial_balance': 1000.0,
+            'entry_fee_pct': 0.0,
+            'exit_fee_pct': 0.0,
+            'slippage_pct': 0.0,
+        },
+    )
+
+    assert report.trades == []
+
+
+def test_risk_prices_are_captured_from_prepare_candle_not_execution_candle():
+    data = _price_frame(
+        open_prices=[100.0, 100.0, 100.0],
+        high_prices=[101.0, 115.0, 105.0],
+        low_prices=[99.0, 80.0, 99.0],
+        close_prices=[100.0, 100.0, 105.0],
+    )
+    strategy = FixedSignalStrategy(
+        size=1.0,
+        long_entry_rows=[0],
+        long_take_profit_prices={1: 110.0},
+        long_stop_loss_prices={1: 95.0},
     )
     report = _backtest_report(
         strategy=strategy,
@@ -337,7 +391,7 @@ def test_slippage_applies_to_take_profit_exit():
         low_prices=[99.0, 98.0, 99.0],
         close_prices=[100.0, 100.0, 100.0],
     )
-    strategy = FixedSignalStrategy(size=1.0, long_entry_rows=[0], long_take_profit_prices={1: 110.0})
+    strategy = FixedSignalStrategy(size=1.0, long_entry_rows=[0], long_take_profit_prices={0: 110.0})
     report = _backtest_report(
         strategy=strategy,
         data=data,
@@ -363,7 +417,7 @@ def test_slippage_applies_to_stop_loss_exit():
         low_prices=[99.0, 90.0, 99.0],
         close_prices=[100.0, 100.0, 100.0],
     )
-    strategy = FixedSignalStrategy(size=1.0, long_entry_rows=[0], long_stop_loss_prices={1: 95.0})
+    strategy = FixedSignalStrategy(size=1.0, long_entry_rows=[0], long_stop_loss_prices={0: 95.0})
     report = _backtest_report(
         strategy=strategy,
         data=data,
