@@ -55,6 +55,26 @@ class CoreStrategy(ABC):
 
         return data
 
+    def long_take_profit_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        data["long_take_profit"] = float("nan")
+
+        return data
+
+    def short_take_profit_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        data["short_take_profit"] = float("nan")
+
+        return data
+
+    def long_stop_loss_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        data["long_stop_loss"] = float("nan")
+
+        return data
+
+    def short_stop_loss_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+        data["short_stop_loss"] = float("nan")
+
+        return data
+
     @abstractmethod
     def position_size(self, balance: float, entry_price: float) -> float:
         pass

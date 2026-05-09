@@ -89,6 +89,9 @@ export interface Trade {
   size: number;
   entry_price: number;
   exit_price: number;
+  take_profit_price: number | null;
+  stop_loss_price: number | null;
+  exit_reason: string;
   entry_datetime: string;
   exit_datetime: string;
   raw_pnl: number;

@@ -65,6 +65,9 @@ class TradeResponse(BaseModel):
     size: float
     entry_price: float
     exit_price: float
+    take_profit_price: Optional[float] = None
+    stop_loss_price: Optional[float] = None
+    exit_reason: str = "signal"
     entry_datetime: str
     exit_datetime: str
     raw_pnl: float

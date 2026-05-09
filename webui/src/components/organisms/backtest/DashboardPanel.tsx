@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 
 import { EquityCurveChart } from "@/components/organisms/backtest/EquityCurveChart";
 import { KpiCards } from "@/components/organisms/backtest/KpiCards";
@@ -144,6 +144,16 @@ export const DashboardPanel = memo(function DashboardPanel({
   };
 
   const heroStateClass = getHeroStateClass(heroState);
+  const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
+  const visibleTrades = selectedTradeId
+    ? recentTrades.filter((trade) => trade.id === selectedTradeId)
+    : recentTrades;
+
+  useEffect(() => {
+    if (selectedTradeId && !recentTrades.some((trade) => trade.id === selectedTradeId)) {
+      setSelectedTradeId(null);
+    }
+  }, [recentTrades, selectedTradeId]);
 
   return (
     <div className="dashboard-panel-surface relative isolate h-full min-h-0 overflow-x-hidden overflow-y-auto px-5 pb-8 pt-5 sm:px-8 sm:pb-10 sm:pt-7 lg:px-10">
@@ -197,8 +207,12 @@ export const DashboardPanel = memo(function DashboardPanel({
         <EquityCurveChart data={equityData} />
         <KpiCards metrics={kpiMetrics} />
         <KpiTable rows={kpiRows} />
-        <MarketOhlcvChart data={marketOhlcvData} trades={recentTrades} themeMode={themeMode} />
-        <RecentTradesTable trades={recentTrades} />
+        <MarketOhlcvChart data={marketOhlcvData} trades={visibleTrades} themeMode={themeMode} />
+        <RecentTradesTable
+          trades={recentTrades}
+          selectedTradeId={selectedTradeId}
+          onSelectedTradeIdChange={setSelectedTradeId}
+        />
       </div>
     </div>
   );

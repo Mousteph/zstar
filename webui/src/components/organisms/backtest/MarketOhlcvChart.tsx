@@ -5,9 +5,12 @@ import { Maximize2, Minimize2, Minus, Plus, RotateCcw } from "lucide-react";
 import {
   ColorType,
   createChart,
+  type BarData,
   type CandlestickData,
   type HistogramData,
   type IChartApi,
+  type LineData,
+  type MouseEventParams,
   type SeriesMarker,
   type Time,
   type UTCTimestamp,
@@ -15,6 +18,7 @@ import {
 
 import { ActionIconButton } from "@/components/molecules/ActionIconButton";
 import { ExpandableSection } from "@/components/molecules/ExpandableSection";
+import { formatCurrency, formatDateTime, formatNumber } from "@/features/backtest/utils";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { readCssVariable } from "@/lib/dom/readCssVariable";
 import { cn } from "@/lib/utils";
@@ -27,6 +31,7 @@ const MAX_BAR_SPACING = 48;
 
 type CandlestickSeriesApi = ReturnType<IChartApi["addCandlestickSeries"]>;
 type HistogramSeriesApi = ReturnType<IChartApi["addHistogramSeries"]>;
+type LineSeriesApi = ReturnType<IChartApi["addLineSeries"]>;
 
 interface MarketOhlcvChartProps {
   readonly data: MarketOhlcvPoint[];
@@ -37,6 +42,20 @@ interface MarketOhlcvChartProps {
 interface PreparedMarketData {
   readonly candles: CandlestickData[];
   readonly volumes: HistogramData[];
+  readonly volumeByTime: Map<number, number>;
+}
+
+interface TradeEvent {
+  readonly type: "entry" | "exit";
+  readonly trade: Trade;
+}
+
+interface CandleTooltipState {
+  readonly left: number;
+  readonly top: number;
+  readonly candle: CandlestickData;
+  readonly volume: number | null;
+  readonly tradeEvents: TradeEvent[];
 }
 
 interface ChartPalette {
@@ -47,6 +66,8 @@ interface ChartPalette {
   readonly upColor: string;
   readonly downColor: string;
   readonly exitColor: string;
+  readonly takeProfitColor: string;
+  readonly stopLossColor: string;
   readonly volumeUpColor: string;
   readonly volumeDownColor: string;
 }
@@ -64,15 +85,42 @@ function isValidNumber(value: number | null): value is number {
   return value !== null && Number.isFinite(value);
 }
 
+function withAlpha(color: string, alpha: number): string {
+  if (/^#[0-9a-f]{6}$/i.test(color)) {
+    const red = Number.parseInt(color.slice(1, 3), 16);
+    const green = Number.parseInt(color.slice(3, 5), 16);
+    const blue = Number.parseInt(color.slice(5, 7), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
+  const rgbRegex = /rgba?\(([^)]+)\)/;
+  const rgbMatch = rgbRegex.exec(color);
+  if (!rgbMatch) {
+    return color;
+  }
+
+  const [red, green, blue] = rgbMatch[1].split(",").map((part) => Number.parseFloat(part.trim()));
+  if (![red, green, blue].every(Number.isFinite)) {
+    return color;
+  }
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
 function getChartPalette(): ChartPalette {
+  const upColor = readCssVariable("--chart-candle-up", "rgb(34,197,94)");
+  const downColor = readCssVariable("--chart-candle-down", "rgb(239,68,68)");
+
   return {
     textColor: readCssVariable("--chart-axis", "rgb(161,161,170)"),
     gridColor: readCssVariable("--chart-grid", "rgba(63,63,70,0.35)"),
     crosshairColor: readCssVariable("--chart-crosshair", "rgba(161,161,170,0.65)"),
     borderColor: readCssVariable("--chart-border", "rgba(63,63,70,1)"),
-    upColor: readCssVariable("--chart-candle-up", "rgb(34,197,94)"),
-    downColor: readCssVariable("--chart-candle-down", "rgb(239,68,68)"),
+    upColor,
+    downColor,
     exitColor: readCssVariable("--chart-exit", "rgb(245,158,11)"),
+    takeProfitColor: withAlpha(upColor, 0.46),
+    stopLossColor: withAlpha(downColor, 0.46),
     volumeUpColor: readCssVariable("--chart-volume-up", "rgba(34,197,94,0.4)"),
     volumeDownColor: readCssVariable("--chart-volume-down", "rgba(239,68,68,0.4)"),
   };
@@ -83,6 +131,7 @@ function prepareMarketData(data: MarketOhlcvPoint[], palette: ChartPalette): Pre
 
   const candles: CandlestickData[] = [];
   const volumes: HistogramData[] = [];
+  const volumeByTime = new Map<number, number>();
   let lastTime: number | null = null;
 
   for (const point of sortedData) {
@@ -119,12 +168,40 @@ function prepareMarketData(data: MarketOhlcvPoint[], palette: ChartPalette): Pre
         value: point.volume,
         color: point.close >= point.open ? palette.volumeUpColor : palette.volumeDownColor,
       });
+      volumeByTime.set(numericTime, point.volume);
     }
 
     lastTime = numericTime;
   }
 
-  return { candles, volumes };
+  return { candles, volumes, volumeByTime };
+}
+
+function buildTradeEventsByTime(trades: Trade[]): Map<number, TradeEvent[]> {
+  const eventsByTime = new Map<number, TradeEvent[]>();
+
+  for (const trade of trades) {
+    const entryTime = parseTimestamp(trade.entry_datetime);
+    const exitTime = parseTimestamp(trade.exit_datetime);
+
+    if (entryTime !== null) {
+      const numericEntryTime = Number(entryTime);
+      eventsByTime.set(numericEntryTime, [
+        ...(eventsByTime.get(numericEntryTime) ?? []),
+        { type: "entry", trade },
+      ]);
+    }
+
+    if (exitTime !== null) {
+      const numericExitTime = Number(exitTime);
+      eventsByTime.set(numericExitTime, [
+        ...(eventsByTime.get(numericExitTime) ?? []),
+        { type: "exit", trade },
+      ]);
+    }
+  }
+
+  return eventsByTime;
 }
 
 function buildTradeMarkers(trades: Trade[], palette: ChartPalette): SeriesMarker<Time>[] {
@@ -166,19 +243,39 @@ function buildTradeMarkers(trades: Trade[], palette: ChartPalette): SeriesMarker
     .sort((a, b) => Number(a.time) - Number(b.time));
 }
 
+function createRiskLineData(trade: Trade, price: number | null): LineData<Time>[] | null {
+  if (!isValidNumber(price)) {
+    return null;
+  }
+
+  const entryTime = parseTimestamp(trade.entry_datetime);
+  const exitTime = parseTimestamp(trade.exit_datetime);
+  if (entryTime === null || exitTime === null) {
+    return null;
+  }
+
+  return [
+    { time: entryTime, value: price },
+    { time: exitTime, value: price },
+  ];
+}
+
 export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhlcvChartProps>) {
   const inlineContainerRef = useRef<HTMLDivElement | null>(null);
   const expandedContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<CandlestickSeriesApi | null>(null);
   const volumeSeriesRef = useRef<HistogramSeriesApi | null>(null);
+  const riskLineSeriesRef = useRef<LineSeriesApi[]>([]);
   const [barSpacing, setBarSpacing] = useState(DEFAULT_BAR_SPACING);
   const [chartInitError, setChartInitError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [tooltipState, setTooltipState] = useState<CandleTooltipState | null>(null);
 
   const palette = useMemo(() => getChartPalette(), [themeMode, isExpanded]);
   const preparedData = useMemo(() => prepareMarketData(data, palette), [data, palette]);
   const tradeMarkers = useMemo(() => buildTradeMarkers(trades, palette), [trades, palette]);
+  const tradeEventsByTime = useMemo(() => buildTradeEventsByTime(trades), [trades]);
 
   useScrollLock(isExpanded);
 
@@ -209,8 +306,10 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
     chartRef.current = null;
     candlestickSeriesRef.current = null;
     volumeSeriesRef.current = null;
+    riskLineSeriesRef.current = [];
 
     let cleanupResize: (() => void) | null = null;
+    let cleanupCrosshair: (() => void) | null = null;
     let animationFrameA: number | null = null;
     let animationFrameB: number | null = null;
 
@@ -270,12 +369,51 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
       candlestickSeries.setData(preparedData.candles);
       volumeSeries.setData(preparedData.volumes);
       candlestickSeries.setMarkers(tradeMarkers);
+      renderRiskLineSeries(chart);
       chart.timeScale().applyOptions({ barSpacing });
       if (preparedData.candles.length > 0) {
         chart.timeScale().fitContent();
       }
 
       setChartInitError(null);
+
+      const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+        if (!param.point || param.time === undefined) {
+          setTooltipState(null);
+          return;
+        }
+
+        const candle = param.seriesData.get(candlestickSeries) as BarData<Time> | undefined;
+        if (!candle || !("open" in candle)) {
+          setTooltipState(null);
+          return;
+        }
+
+        const numericTime = Number(param.time);
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        const tooltipWidth = 210;
+        const tooltipHeight = 248;
+        const preferredLeft = param.point.x + 14;
+        const preferredTop = param.point.y + 14;
+
+        setTooltipState({
+          left: Math.min(Math.max(preferredLeft, 8), Math.max(containerWidth - tooltipWidth - 8, 8)),
+          top: Math.min(Math.max(preferredTop, 8), Math.max(containerHeight - tooltipHeight - 8, 8)),
+          candle: {
+            time: candle.time,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+          },
+          volume: preparedData.volumeByTime.get(numericTime) ?? null,
+          tradeEvents: tradeEventsByTime.get(numericTime) ?? [],
+        });
+      };
+
+      chart.subscribeCrosshairMove(handleCrosshairMove);
+      cleanupCrosshair = () => chart.unsubscribeCrosshairMove(handleCrosshairMove);
 
       const applyCurrentSize = () => {
         const rect = container.getBoundingClientRect();
@@ -327,12 +465,15 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
         cancelAnimationFrame(animationFrameB);
       }
       cleanupResize?.();
+      cleanupCrosshair?.();
+      setTooltipState(null);
       chartRef.current?.remove();
       chartRef.current = null;
       candlestickSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      riskLineSeriesRef.current = [];
     };
-  }, [isExpanded, palette]);
+  }, [isExpanded, palette, preparedData.volumeByTime, tradeEventsByTime]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -346,6 +487,7 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
       candlestickSeries.setData(preparedData.candles);
       volumeSeries.setData(preparedData.volumes);
       candlestickSeries.setMarkers(tradeMarkers);
+      renderRiskLineSeries(chart);
 
       if (preparedData.candles.length > 0) {
         chart.timeScale().fitContent();
@@ -355,6 +497,44 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
       setChartInitError("Unable to render market chart data.");
     }
   }, [preparedData, tradeMarkers]);
+
+  const renderRiskLineSeries = (chart: IChartApi) => {
+    for (const series of riskLineSeriesRef.current) {
+      chart.removeSeries(series);
+    }
+
+    riskLineSeriesRef.current = [];
+
+    for (const trade of trades) {
+      const riskLines = [
+        {
+          data: createRiskLineData(trade, trade.take_profit_price),
+          color: palette.takeProfitColor,
+        },
+        {
+          data: createRiskLineData(trade, trade.stop_loss_price),
+          color: palette.stopLossColor,
+        },
+      ];
+
+      for (const riskLine of riskLines) {
+        if (riskLine.data === null) {
+          continue;
+        }
+
+        const series = chart.addLineSeries({
+          color: riskLine.color,
+          lineWidth: 2,
+          lastValueVisible: false,
+          priceLineVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        series.applyOptions({ priceScaleId: "right" });
+        series.setData(riskLine.data);
+        riskLineSeriesRef.current.push(series);
+      }
+    }
+  };
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -423,9 +603,69 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
         </p>
       ) : null}
       <div
-        ref={isExpanded ? expandedContainerRef : inlineContainerRef}
-        className={cn("w-full", isExpanded ? "min-h-[420px] flex-1" : "h-[440px]")}
-      />
+        className={cn("relative w-full", isExpanded ? "min-h-[420px] flex-1" : "h-[440px]")}
+      >
+        <div
+          ref={isExpanded ? expandedContainerRef : inlineContainerRef}
+          className="h-full w-full"
+        />
+        {tooltipState ? (
+          <div
+            className="pointer-events-none absolute z-10 w-[210px] rounded-md border border-border/80 bg-background/90 px-3 py-2 text-xs text-foreground shadow-xl backdrop-blur-md"
+            style={{ left: tooltipState.left, top: tooltipState.top }}
+          >
+            <p className="mb-1 truncate text-[0.68rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              {typeof tooltipState.candle.time === "number"
+                ? formatDateTime(new Date(tooltipState.candle.time * 1000).toISOString())
+                : String(tooltipState.candle.time)}
+            </p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <span className="text-muted-foreground">Open</span>
+              <span className="text-right tabular-nums">{formatCurrency(tooltipState.candle.open)}</span>
+              <span className="text-muted-foreground">Close</span>
+              <span className="text-right tabular-nums">{formatCurrency(tooltipState.candle.close)}</span>
+              <span className="text-muted-foreground">Low</span>
+              <span className="text-right tabular-nums">{formatCurrency(tooltipState.candle.low)}</span>
+              <span className="text-muted-foreground">High</span>
+              <span className="text-right tabular-nums">{formatCurrency(tooltipState.candle.high)}</span>
+              <span className="text-muted-foreground">Volume</span>
+              <span className="text-right tabular-nums">
+                {tooltipState.volume === null ? "N/A" : formatNumber(tooltipState.volume)}
+              </span>
+            </div>
+            {tooltipState.tradeEvents.length > 0 ? (
+              <div className="mt-2 border-t border-border/70 pt-2">
+                {tooltipState.tradeEvents.map((event) => (
+                  <div key={`${event.trade.id}-${event.type}`} className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={event.type === "entry" ? "text-emerald-400" : "text-amber-400"}>
+                        {event.type === "entry" ? "Entry" : "Exit"}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {formatCurrency(event.type === "entry" ? event.trade.entry_price : event.trade.exit_price)}
+                      </span>
+                    </div>
+                    {event.trade.stop_loss_price !== null ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-red-400">Stop Loss</span>
+                        <span className="text-right tabular-nums">{formatCurrency(event.trade.stop_loss_price)}</span>
+                      </div>
+                    ) : null}
+                    {event.trade.take_profit_price !== null ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-emerald-400">Take Profit</span>
+                        <span className="text-right tabular-nums">
+                          {formatCurrency(event.trade.take_profit_price)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </ExpandableSection>
   );
 }

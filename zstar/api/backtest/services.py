@@ -62,6 +62,9 @@ def serialize_trades(trades: List[Trade], symbol: str) -> List[TradeResponse]:
             size=float(trade.size),
             entry_price=float(trade.entry_price),
             exit_price=float(trade.exit_price),
+            take_profit_price=safe_number(trade.take_profit_price),
+            stop_loss_price=safe_number(trade.stop_loss_price),
+            exit_reason=trade.exit_reason,
             entry_datetime=timestamp_to_iso(trade.entry_datetime),
             exit_datetime=timestamp_to_iso(trade.exit_datetime),
             raw_pnl=float(trade.raw_pnl),
@@ -78,8 +81,8 @@ def serialize_equity_curve(report: BacktestReport) -> List[EquityPointResponse]:
         rows.append(
             EquityPointResponse(
                 datetime=timestamp_to_iso(row.Index),
-                strategy=safe_number(row.strategy),  # type: ignore[arg-type]
-                buy_and_hold=safe_number(row.buy_and_hold),  # type: ignore[arg-type]
+                strategy=safe_number(row.strategy),
+                buy_and_hold=safe_number(row.buy_and_hold),
             )
         )
 
@@ -126,25 +129,22 @@ def build_backtest_meta(
 def safe_number(value: Any) -> Optional[float | str]:
     if value is None:
         return None
+    
     if isinstance(value, str):
         return value
+    
     if isinstance(value, (np.floating, float)):
         numeric = float(value)
         if math.isnan(numeric) or math.isinf(numeric):
             return None
         return numeric
+
     if isinstance(value, (np.integer, int)):
         return float(value)
+    
     return str(value)
 
 
 def timestamp_to_iso(value: pd.Timestamp | datetime) -> str:
-    if isinstance(value, pd.Timestamp):
-        if value.tzinfo is None:
-            return value.tz_localize("UTC").isoformat()
-        return value.tz_convert("UTC").isoformat()
-
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc).isoformat()
-
-    return value.astimezone(timezone.utc).isoformat()
+    timestamp = pd.Timestamp(value)
+    return timestamp.isoformat()
