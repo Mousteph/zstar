@@ -10,12 +10,12 @@ from zstar.core.backtest.backtest_report import BacktestReport
 from zstar.core.strategy import CoreStrategy
 from zstar.core.strategy.validate_strategy import ValidationResult
 from zstar.api.backtest.models import ValidateStrategiesResponse, ValidationIssueResponse
-from zstar.api.start_backend import app
+from zstar.api.start_backend import create_app
 
 backtest_router_module = importlib.import_module("zstar.api.backtest.backtest_router")
 strategy_file_utils_module = importlib.import_module("zstar.api.utils.strategy_file_utils")
 csv_file_utils_module = importlib.import_module("zstar.api.utils.csv_file_utils")
-client = TestClient(app)
+client = TestClient(create_app())
 
 class SimpleStrategy(CoreStrategy):
     def long_entry_signals(self, data):
@@ -472,3 +472,18 @@ def test_run_backtest_serializes_nan_and_inf_kpis_to_null(monkeypatch):
     assert body["strategy_validation"] is None
     assert body["backtest_result"]["kpis"]["profit_factor"] is None
     assert body["backtest_result"]["kpis"]["sharpe_ratio"] is None
+
+
+def test_run_backtest_hides_unexpected_internal_error_details(monkeypatch):
+    monkeypatch.setattr(
+        backtest_router_module,
+        "resolve_strategy_validation",
+        lambda _strategy_filename: (_ for _ in ()).throw(RuntimeError("secret implementation detail")),
+    )
+
+    response = client.post("/api/backtest/run", json=_payload())
+
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert "An unexpected error occurred" in detail
+    assert "secret implementation detail" not in detail

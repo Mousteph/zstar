@@ -59,7 +59,10 @@ def run_backtest(request: BacktestRunRequest) -> BacktestRunEnvelopeResponse:
         raise HTTPException(status_code=exc.status_code, detail=f"{exc.error_code}:\n- {str(exc)}") from exc
     except Exception as exc:
         logger.exception("Backtest failed with internal error")
-        raise HTTPException(status_code=500, detail=f"INTERNAL_SERVER_ERROR: {str(exc)}") from exc
+        raise HTTPException(
+            status_code=500,
+            detail="INTERNAL_SERVER_ERROR: An unexpected error occurred while running the backtest.",
+        ) from exc
 
     return BacktestRunEnvelopeResponse(
         strategy_validation=None,
@@ -93,8 +96,8 @@ def build_data_handler(request: BacktestRunRequest) -> DataHandler:
 
     return YahooData(
         symbol=request.data.symbol,
-        start_date=request.data.start_date,
-        end_date=request.data.end_date,
+        start_date=str(request.data.start_date) if request.data.start_date is not None else None,
+        end_date=str(request.data.end_date) if request.data.end_date is not None else None,
         interval=request.data.interval,
     )
 
@@ -112,8 +115,8 @@ def build_response_meta(request: BacktestRunRequest, data_handler: DataHandler, 
 
     return build_backtest_meta(
         symbol=request.data.symbol,
-        start_date=request.data.start_date or "",
-        end_date=request.data.end_date or "",
+        start_date=str(request.data.start_date) if request.data.start_date is not None else "",
+        end_date=str(request.data.end_date) if request.data.end_date is not None else "",
         interval=request.data.interval,
         bars_count=bars_count,
     )

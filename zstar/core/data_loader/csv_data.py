@@ -24,8 +24,18 @@ def prepare_csv_data(data: pd.DataFrame, filename: str) -> pd.DataFrame:
     if data.empty:
         raise CsvDataError(f"CSV file {filename} does not contain readable dates.")
 
-    data = data.set_index("date")
-    data = data.sort_index()
+    numeric_columns = ["open", "high", "low", "close", "volume"]
+    for column in numeric_columns:
+        data[column] = pd.to_numeric(data[column], errors="coerce")
+
+    invalid_columns = [column for column in numeric_columns if data[column].isna().any()]
+    if invalid_columns:
+        raise CsvDataError(
+            f"CSV file {filename} contains non-numeric values in required columns: {', '.join(invalid_columns)}."
+        )
+
+    data = data.set_index("date").sort_index()
+    
     return data[["open", "high", "low", "close", "volume"]]
 
 

@@ -34,6 +34,29 @@ def test_data_loader_model_rejects_end_date_before_start_date():
         )
 
 
+def test_data_loader_model_parses_dates_before_comparison():
+    config = YahooDataLoaderConfigModel(
+        source="yahoo",
+        symbol="MSFT",
+        start_date="2025-01-02",
+        end_date="2025-01-10",
+        interval="1d",
+    )
+
+    assert config.start_date.isoformat() == "2025-01-02"
+    assert config.end_date.isoformat() == "2025-01-10"
+
+
+def test_data_loader_model_rejects_invalid_date_format():
+    with pytest.raises(ValidationError):
+        YahooDataLoaderConfigModel(
+            source="yahoo",
+            symbol="MSFT",
+            start_date="not-a-date",
+            interval="1d",
+        )
+
+
 def test_csv_data_loads_ohlcv_file(tmp_path):
     data_dir = tmp_path / "Data"
     data_dir.mkdir()
@@ -73,6 +96,19 @@ def test_csv_data_rejects_unreadable_dates(tmp_path):
     )
 
     with pytest.raises(Exception, match="readable dates"):
+        CsvData(str(csv_path))
+
+
+def test_csv_data_rejects_non_numeric_ohlcv_values(tmp_path):
+    data_dir = tmp_path / "Data"
+    data_dir.mkdir()
+    csv_path = data_dir / "bad_values.csv"
+    csv_path.write_text(
+        "date,open,high,low,close,volume\n2025-01-01,99,not-a-number,98,101,900\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(Exception, match="non-numeric values"):
         CsvData(str(csv_path))
 
 

@@ -124,6 +124,54 @@ def test_long_trade_records_entry_and_exit_prices_and_balance():
     assert trade.net_pnl == pytest.approx(50.0)
 
 
+def test_nan_signal_values_do_not_trigger_entries():
+    data = _price_frame(open_prices=[100.0, 110.0], close_prices=[101.0, 111.0])
+
+    class NanSignalStrategy(FixedSignalStrategy):
+        def long_entry_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+            data["long_entry"] = float("nan")
+            return data
+
+    strategy = NanSignalStrategy(size=1.0)
+    report = _backtest_report(
+        strategy=strategy,
+        data=data,
+        config={
+            'initial_balance': 1000.0,
+            'entry_fee_pct': 0.0,
+            'exit_fee_pct': 0.0,
+            'slippage_pct': 0.0,
+        },
+    )
+
+    assert report.trades == []
+    assert report.final_balance == pytest.approx(1000.0)
+
+
+def test_non_one_numeric_signal_values_do_not_trigger_entries():
+    data = _price_frame(open_prices=[100.0, 110.0], close_prices=[101.0, 111.0])
+
+    class NonOneSignalStrategy(FixedSignalStrategy):
+        def long_entry_signals(self, data: pd.DataFrame) -> pd.DataFrame:
+            data["long_entry"] = 2
+            return data
+
+    strategy = NonOneSignalStrategy(size=1.0)
+    report = _backtest_report(
+        strategy=strategy,
+        data=data,
+        config={
+            'initial_balance': 1000.0,
+            'entry_fee_pct': 0.0,
+            'exit_fee_pct': 0.0,
+            'slippage_pct': 0.0,
+        },
+    )
+
+    assert report.trades == []
+    assert report.final_balance == pytest.approx(1000.0)
+
+
 def test_short_trade_records_entry_and_exit_prices_and_balance():
     data = _price_frame(open_prices=[200.0, 180.0, 170.0], close_prices=[199.0, 179.0, 171.0])
     strategy = FixedSignalStrategy(size=4.0, short_entry_rows=[0], short_exit_rows=[1])

@@ -55,7 +55,9 @@ class BacktesterEngine:
             return False
 
         side = self._portfolio.get_position().get_side()
-        return (side.is_long() and row.long_exit) or (side.is_short() and row.short_exit)
+        return (side.is_long() and self._is_signal_active(row.long_exit)) or (
+            side.is_short() and self._is_signal_active(row.short_exit)
+        )
 
 
     @func_errors(BacktestExecutionError, "An error occurred during backtest execution")
@@ -88,10 +90,10 @@ class BacktesterEngine:
             if self._should_mark_position_pending_close(row):
                 self._portfolio.set_pending_close()
 
-            if not self._portfolio.has_position() and row.long_entry:
+            if not self._portfolio.has_position() and self._is_signal_active(row.long_entry):
                 self._prepare_entry_order(TradeSide.LONG, row)
 
-            if not self._portfolio.has_position() and row.short_entry:
+            if not self._portfolio.has_position() and self._is_signal_active(row.short_entry):
                 self._prepare_entry_order(TradeSide.SHORT, row)
 
         if self._portfolio.is_position_open():
@@ -230,3 +232,10 @@ class BacktesterEngine:
             return None
 
         return price
+
+
+    def _is_signal_active(self, value: Any) -> bool:
+        if value is None or pd.isna(value):
+            return False
+
+        return value is True or value == 1

@@ -11,6 +11,9 @@ from zstar.config import AppConfig, load_config
 from zstar.logger import clear_log_context, get_logger, set_log_context, setup_logging
 
 
+_lazy_app: FastAPI | None = None
+
+
 def create_app(settings: AppConfig | None = None, *, configure_logging: bool = True) -> FastAPI:
     app_settings = settings or load_config()
     logger = get_logger(__name__)
@@ -64,4 +67,8 @@ def create_app(settings: AppConfig | None = None, *, configure_logging: bool = T
     return application
 
 
-app = create_app()
+async def app(scope, receive, send) -> None:
+    global _lazy_app
+    if _lazy_app is None:
+        _lazy_app = create_app()
+    await _lazy_app(scope, receive, send)
