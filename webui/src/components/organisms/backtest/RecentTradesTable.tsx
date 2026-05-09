@@ -64,26 +64,28 @@ export function RecentTradesTable({
               return (
                 <TableRow
                   key={trade.id}
+                  data-state={isSelected ? "selected" : "idle"}
                   className={[
                     getTradeRowClassName(index),
-                    "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    "cursor-pointer",
                     isSelected ? "bg-emerald-500/10 ring-1 ring-emerald-400/40 hover:bg-emerald-500/15" : "",
                     selectedTradeId && !isSelected ? "opacity-45 hover:opacity-70" : "",
                   ].join(" ")}
-                  tabIndex={0}
-                  aria-pressed={isSelected}
-                  role="button"
-                  title={isSelected ? "Show all trades on the chart" : "Show only this trade on the chart"}
                   onClick={() => toggleSelectedTrade(trade.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      toggleSelectedTrade(trade.id);
-                    }
-                  }}
                 >
                   <TableCell className="py-3 text-[0.94rem] font-medium">
-                    {formatDateTime(trade.entry_datetime)}
+                    <button
+                      type="button"
+                      className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      aria-pressed={isSelected}
+                      title={isSelected ? "Show all trades on the chart" : "Show only this trade on the chart"}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleSelectedTrade(trade.id);
+                      }}
+                    >
+                      {formatDateTime(trade.entry_datetime)}
+                    </button>
                   </TableCell>
                   <TableCell className="py-3 text-[0.94rem]">{formatDateTime(trade.exit_datetime)}</TableCell>
                   <TableCell className="py-3 text-[0.94rem]">{trade.symbol}</TableCell>
