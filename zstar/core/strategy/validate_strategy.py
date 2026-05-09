@@ -146,13 +146,6 @@ class ValidateStrategy:
         return issues
 
 
-    def _execute_strategy_code(self, code: str) -> Dict[str, object]:
-        if self.strategy_path is None:
-            return self._execute_inline_code(code)
-
-        return self._execute_file_module(code)
-
-
     def _execute_inline_code(self, code: str) -> Dict[str, object]:
         scope = {"__builtins__": __builtins__}
         compiled = compile(code, self.strategy_filename, "exec")

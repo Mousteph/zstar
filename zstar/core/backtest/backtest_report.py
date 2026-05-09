@@ -424,7 +424,7 @@ class BacktestReport:
         return float(np.median(pnls)) if pnls.size > 0 else 0.0
 
 
-    def kpis(self) -> dict[str, float]:
+    def kpis(self) -> dict[str, float | int]:
         pnls = self._trade_pnls()
         wins = self._winning_pnls(pnls)
         losses = self._losing_pnls(pnls)
