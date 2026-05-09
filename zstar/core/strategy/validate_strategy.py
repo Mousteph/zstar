@@ -257,6 +257,11 @@ class ValidateStrategy:
             if not self._is_signal_dtype_valid(signal_data):
                 message = f"Signal column '{column_name}' must contain numeric or boolean values."
                 issues.append(ValidationIssue("type", self.strategy_filename, None, message))
+                continue
+
+            if not self._contains_only_binary_signals(signal_data):
+                message = f"Signal column '{column_name}' must contain only 0/1, True/False, or missing values."
+                issues.append(ValidationIssue("type", self.strategy_filename, None, message))
 
         for column_name in self.risk_price_columns:
             if column_name in data.columns and not pd.api.types.is_numeric_dtype(data[column_name]):
@@ -274,8 +279,8 @@ class ValidateStrategy:
             return ValidationIssue("logic", file_name, line, message)
 
         is_numeric = isinstance(size, (int, float, np.integer, np.floating))
-        if not is_numeric or float(size) <= 0:
-            message = "position_size(balance, entry_price) must return a positive numeric value."
+        if not is_numeric or not np.isfinite(float(size)) or float(size) <= 0:
+            message = "position_size(balance, entry_price) must return a finite positive numeric value."
             return ValidationIssue("type", self.strategy_filename, None, message)
 
         return None
@@ -293,6 +298,14 @@ class ValidateStrategy:
 
     def _is_signal_dtype_valid(self, data: pd.Series) -> bool:
         return pd.api.types.is_bool_dtype(data) or pd.api.types.is_numeric_dtype(data)
+
+
+    def _contains_only_binary_signals(self, data: pd.Series) -> bool:
+        normalized = data.dropna()
+        if normalized.empty:
+            return True
+
+        return normalized.isin([0, 1, False, True]).all()
 
 
     def _format_syntax_error(self, error: SyntaxError, code: str) -> Tuple[str, Optional[int]]:

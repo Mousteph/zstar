@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppHeader } from "@/components/organisms/backtest/AppHeader";
 import { BacktestSettingsPanel } from "@/components/organisms/backtest/BacktestSettingsPanel";
@@ -17,13 +17,15 @@ const EMPTY_MARKET_OHLCV_DATA: MarketOhlcvPoint[] = [];
 const EMPTY_TRADES: Trade[] = [];
 const EMPTY_KPI_METRICS: KpiMetric[] = [];
 const EMPTY_KPI_ROWS: KpiRow[] = [];
+const CONFIGURED_DEFAULT_STRATEGY = "default_strategy";
 
 export function BacktestWorkbench() {
-  const [selectedStrategy, setSelectedStrategy] = useState("default_strategy");
+  const [selectedStrategy, setSelectedStrategy] = useState(CONFIGURED_DEFAULT_STRATEGY);
   const [strategyOptions, setStrategyOptions] = useState<string[]>([]);
   const [isStrategyMenuOpen, setIsStrategyMenuOpen] = useState(false);
   const [isStrategiesLoading, setIsStrategiesLoading] = useState(false);
   const [strategiesError, setStrategiesError] = useState<string | null>(null);
+  const strategyRequestIdRef = useRef(0);
 
   const {
     isSettingsOpen,
@@ -63,6 +65,51 @@ export function BacktestWorkbench() {
     setIsStrategyMenuOpen(false);
   }, []);
 
+  const loadStrategies = useCallback(() => {
+    const requestId = strategyRequestIdRef.current + 1;
+    strategyRequestIdRef.current = requestId;
+    setIsStrategiesLoading(true);
+    setStrategiesError(null);
+
+    void fetchStrategies()
+      .then((strategies) => {
+        if (requestId !== strategyRequestIdRef.current) {
+          return;
+        }
+
+        setStrategyOptions(strategies);
+        setSelectedStrategy((currentStrategy) => {
+          if (strategies.includes(currentStrategy)) {
+            return currentStrategy;
+          }
+
+          if (strategies.includes(CONFIGURED_DEFAULT_STRATEGY)) {
+            return CONFIGURED_DEFAULT_STRATEGY;
+          }
+
+          return strategies[0] ?? currentStrategy;
+        });
+      })
+      .catch((error: unknown) => {
+        if (requestId !== strategyRequestIdRef.current) {
+          return;
+        }
+
+        setStrategiesError(error instanceof Error ? error.message : "Unable to fetch strategies.");
+      })
+      .finally(() => {
+        if (requestId !== strategyRequestIdRef.current) {
+          return;
+        }
+
+        setIsStrategiesLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    loadStrategies();
+  }, [loadStrategies]);
+
   const toggleStrategyMenu = useCallback(() => {
     if (isStrategyMenuOpen) {
       setIsStrategyMenuOpen(false);
@@ -70,20 +117,22 @@ export function BacktestWorkbench() {
     }
 
     setIsStrategyMenuOpen(true);
-    setIsStrategiesLoading(true);
-    setStrategiesError(null);
+    loadStrategies();
+  }, [isStrategyMenuOpen, loadStrategies]);
 
-    void fetchStrategies()
-      .then((strategies) => {
-        setStrategyOptions(strategies);
-      })
-      .catch((error: unknown) => {
-        setStrategiesError(error instanceof Error ? error.message : "Unable to fetch strategies.");
-      })
-      .finally(() => {
-        setIsStrategiesLoading(false);
-      });
-  }, [isStrategyMenuOpen]);
+  const selectedStrategyPayload = selectedStrategy.trim() || undefined;
+
+  const canRunBacktest =
+    !isRunning &&
+    !isValidating &&
+    (settings.dataSource !== "csv" || settings.csvFilename.trim().length > 0);
+
+  const canCheckCode = !isRunning && !isValidating && Boolean(selectedStrategyPayload);
+
+  const runDisabledReason =
+    settings.dataSource === "csv" && !settings.csvFilename.trim()
+      ? "Select or upload a CSV file before running."
+      : undefined;
 
   const dashboardPanel = (
     <DashboardPanel
@@ -123,11 +172,14 @@ export function BacktestWorkbench() {
         strategiesError={strategiesError}
         themeMode={themeMode}
         onRunBacktest={() => {
-          void runCurrentBacktest(selectedStrategy);
+          void runCurrentBacktest(selectedStrategyPayload);
         }}
         onCheckCode={() => {
-          void runValidation(selectedStrategy);
+          void runValidation(selectedStrategyPayload);
         }}
+        canRunBacktest={canRunBacktest}
+        canCheckCode={canCheckCode}
+        runDisabledReason={runDisabledReason}
         onOpenSettings={openSettings}
         onToggleTheme={toggleThemeMode}
         onToggleStrategyMenu={toggleStrategyMenu}

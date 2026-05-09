@@ -111,7 +111,7 @@ def test_load_config_raises_clear_error_for_missing_required_field(tmp_path):
     assert "Example: 8000" in message
 
 
-def test_load_config_rejects_invalid_url_port_path_and_unknown_fields(tmp_path):
+def test_load_config_rejects_invalid_url_port_and_unknown_fields(tmp_path):
     clear_config_cache()
     strategies_dir = tmp_path / "strategies"
     strategies_dir.mkdir()
@@ -164,6 +164,19 @@ def test_load_config_rejects_missing_strategies_dir(tmp_path):
 
     assert "paths.strategies_dir" in str(exc_info.value)
     assert "Example: strategies" in str(exc_info.value)
+
+
+def test_load_config_creates_missing_data_dir(tmp_path):
+    clear_config_cache()
+    strategies_dir = tmp_path / "strategies"
+    strategies_dir.mkdir()
+    data_dir = tmp_path / "new-data"
+    config_path = _write_config(tmp_path / "config.yaml", strategies_dir, data_dir)
+
+    config = load_config(config_path)
+
+    assert data_dir.is_dir()
+    assert config.paths.data_dir == data_dir.resolve()
 
 
 def test_loaded_config_is_immutable(tmp_path):

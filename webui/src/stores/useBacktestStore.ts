@@ -27,6 +27,45 @@ interface BacktestState {
   runCurrentBacktest: (strategyFilename?: string) => Promise<void>;
 }
 
+function validateNumericSetting(label: string, value: number, min: number, max?: number): string | null {
+  if (!Number.isFinite(value)) {
+    return `${label} must be a numeric value.`;
+  }
+
+  if (value < min) {
+    return `${label} must be greater than or equal to ${min}.`;
+  }
+
+  if (max !== undefined && value > max) {
+    return `${label} must be less than or equal to ${max}.`;
+  }
+
+  return null;
+}
+
+function validateSettings(settings: BacktestSettings, slippageSeedPayload: number | undefined): string | null {
+  if (settings.dataSource === "csv" && !settings.csvFilename.trim()) {
+    return "Select or upload a CSV file before running a CSV backtest.";
+  }
+
+  const numericValidationErrors = [
+    validateNumericSetting("Initial balance", settings.initialBalance, 0),
+    validateNumericSetting("Entry fee %", settings.entryFeePct, 0, 100),
+    validateNumericSetting("Exit fee %", settings.exitFeePct, 0, 100),
+    validateNumericSetting("Slippage %", settings.slippagePct, 0, 100),
+  ].filter((message): message is string => message !== null);
+
+  if (numericValidationErrors.length > 0) {
+    return numericValidationErrors[0];
+  }
+
+  if (settings.slippageSeed.trim() && slippageSeedPayload === undefined) {
+    return "Slippage seed must be an integer.";
+  }
+
+  return null;
+}
+
 export const useBacktestStore = create<BacktestState>((set, get) => ({
   isRunning: false,
   isValidating: false,
@@ -119,9 +158,21 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
     const slippageSeed = settings.slippageSeed.trim();
     const parsedSlippageSeed = slippageSeed ? Number(slippageSeed) : undefined;
     const slippageSeedPayload =
-      parsedSlippageSeed !== undefined && Number.isFinite(parsedSlippageSeed)
+      parsedSlippageSeed !== undefined && Number.isInteger(parsedSlippageSeed)
         ? parsedSlippageSeed
         : undefined;
+    const validationError = validateSettings(settings, slippageSeedPayload);
+
+    if (validationError) {
+      set({
+        isRunning: false,
+        runStatus: {
+          tone: "error",
+          message: validationError,
+        },
+      });
+      return;
+    }
 
     try {
       const response = await runBacktest({

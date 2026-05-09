@@ -90,6 +90,42 @@ class BadLogicStrategy(CoreStrategy):
     assert result.issues[0].category == "type"
 
 
+def test_validate_strategy_rejects_non_finite_position_size():
+    validator = ValidateStrategy(strategy_filename="bad_size.py")
+    code = """
+from zstar.core.strategy import CoreStrategy
+
+class BadSizeStrategy(CoreStrategy):
+    def position_size(self, balance, entry_price):
+        return float("nan")
+"""
+    _, result = validator.validate_result(code)
+
+    assert result.total_errors == 1
+    assert result.issues[0].category == "type"
+    assert "finite positive" in result.issues[0].message
+
+
+def test_validate_strategy_rejects_non_binary_signal_values():
+    validator = ValidateStrategy(strategy_filename="bad_signal.py")
+    code = """
+from zstar.core.strategy import CoreStrategy
+
+class BadSignalStrategy(CoreStrategy):
+    def long_entry_signals(self, data):
+        data["long_entry"] = 2
+        return data
+
+    def position_size(self, balance, entry_price):
+        return 1
+"""
+    _, result = validator.validate_result(code)
+
+    assert result.total_errors == 1
+    assert result.issues[0].category == "type"
+    assert "0/1" in result.issues[0].message
+
+
 def test_validate_strategy_reports_runtime_exception():
     validator = ValidateStrategy(strategy_filename="runtime.py")
     code = """

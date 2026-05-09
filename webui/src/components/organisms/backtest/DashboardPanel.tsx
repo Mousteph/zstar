@@ -145,9 +145,10 @@ export const DashboardPanel = memo(function DashboardPanel({
 
   const heroStateClass = getHeroStateClass(heroState);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
-  const visibleTrades = selectedTradeId
+  const selectedTrades = selectedTradeId
     ? recentTrades.filter((trade) => trade.id === selectedTradeId)
-    : recentTrades;
+    : [];
+  const visibleTrades = selectedTradeId ? selectedTrades : recentTrades;
 
   useEffect(() => {
     if (selectedTradeId && !recentTrades.some((trade) => trade.id === selectedTradeId)) {
@@ -207,7 +208,12 @@ export const DashboardPanel = memo(function DashboardPanel({
         <EquityCurveChart data={equityData} />
         <KpiCards metrics={kpiMetrics} />
         <KpiTable rows={kpiRows} />
-        <MarketOhlcvChart data={marketOhlcvData} trades={visibleTrades} themeMode={themeMode} />
+        <MarketOhlcvChart
+          data={marketOhlcvData}
+          trades={visibleTrades}
+          riskOverlayTrades={selectedTrades}
+          themeMode={themeMode}
+        />
         <RecentTradesTable
           trades={recentTrades}
           selectedTradeId={selectedTradeId}

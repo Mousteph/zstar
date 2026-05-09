@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 import time
 from typing import AsyncIterator
@@ -9,6 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from zstar.api.backtest import backtest_router, csv_router, strategy_router
 from zstar.config import AppConfig, load_config
 from zstar.logger import clear_log_context, get_logger, set_log_context, setup_logging
+
+
+_lazy_app: FastAPI | None = None
+_lazy_app_lock = asyncio.Lock()
 
 
 def create_app(settings: AppConfig | None = None, *, configure_logging: bool = True) -> FastAPI:
@@ -64,4 +69,10 @@ def create_app(settings: AppConfig | None = None, *, configure_logging: bool = T
     return application
 
 
-app = create_app()
+async def app(scope, receive, send) -> None:
+    global _lazy_app
+    if _lazy_app is None:
+        async with _lazy_app_lock:
+            if _lazy_app is None:
+                _lazy_app = create_app()
+    await _lazy_app(scope, receive, send)

@@ -8,6 +8,30 @@ import type {
   ValidateStrategyRequest,
 } from "@/types/backtest";
 
+type ErrorPayload = {
+  detail?: string;
+};
+
+async function readResponsePayload<T>(response: Response, fallbackMessage: string): Promise<T | ErrorPayload> {
+  const text = await response.text();
+  if (!text) {
+    return response.ok ? ({} as T) : { detail: fallbackMessage };
+  }
+
+  try {
+    return JSON.parse(text) as T | ErrorPayload;
+  } catch {
+    return { detail: response.ok ? "Invalid JSON response payload." : text || fallbackMessage };
+  }
+}
+
+function errorDetail(payload: unknown, fallbackMessage: string): string {
+  return payload &&
+    typeof payload === "object" &&
+    "detail" in payload &&
+    typeof payload.detail === "string" ? payload.detail : fallbackMessage;
+}
+
 export async function runBacktest(payload: BacktestRunRequest): Promise<BacktestRunEnvelopeResponse> {
   const response = await fetch("/api/backtest/run", {
     method: "POST",
@@ -17,18 +41,13 @@ export async function runBacktest(payload: BacktestRunRequest): Promise<Backtest
     body: JSON.stringify(payload),
   });
 
-  const responseJson = (await response.json()) as
-    | BacktestRunEnvelopeResponse
-    | {
-        detail?: string;
-      };
+  const responseJson = await readResponsePayload<BacktestRunEnvelopeResponse>(
+    response,
+    "Backtest failed. Please check your strategy and settings.",
+  );
 
   if (!response.ok) {
-    const detail =
-      "detail" in responseJson && typeof responseJson.detail === "string"
-        ? responseJson.detail
-        : "Backtest failed. Please check your strategy and settings.";
-    throw new Error(detail);
+    throw new Error(errorDetail(responseJson, "Backtest failed. Please check your strategy and settings."));
   }
 
   if (
@@ -46,18 +65,10 @@ export async function fetchStrategies(): Promise<string[]> {
     method: "GET",
   });
 
-  const responseJson = (await response.json()) as
-    | StrategiesResponse
-    | {
-        detail?: string;
-      };
+  const responseJson = await readResponsePayload<StrategiesResponse>(response, "Unable to fetch strategies.");
 
   if (!response.ok) {
-    const detail =
-      "detail" in responseJson && typeof responseJson.detail === "string"
-        ? responseJson.detail
-        : "Unable to fetch strategies.";
-    throw new Error(detail);
+    throw new Error(errorDetail(responseJson, "Unable to fetch strategies."));
   }
 
   if (!("strategies" in responseJson) || !Array.isArray(responseJson.strategies)) {
@@ -76,14 +87,10 @@ export async function checkStrategyCode(payload: ValidateStrategyRequest): Promi
     body: JSON.stringify(payload),
   });
 
-  const responseJson = (await response.json()) as StrategyValidationResult;
+  const responseJson = await readResponsePayload<StrategyValidationResult>(response, "Unable to validate strategy.");
 
   if (!response.ok) {
-    const detail =
-      "detail" in responseJson && typeof responseJson.detail === "string"
-        ? responseJson.detail
-        : "Unable to validate strategy.";
-    throw new Error(detail);
+    throw new Error(errorDetail(responseJson, "Unable to validate strategy."));
   }
 
   if (
@@ -103,18 +110,10 @@ export async function fetchCsvFiles(): Promise<string[]> {
     method: "GET",
   });
 
-  const responseJson = (await response.json()) as
-    | CsvFilesResponse
-    | {
-        detail?: string;
-      };
+  const responseJson = await readResponsePayload<CsvFilesResponse>(response, "Unable to fetch CSV files.");
 
   if (!response.ok) {
-    const detail =
-      "detail" in responseJson && typeof responseJson.detail === "string"
-        ? responseJson.detail
-        : "Unable to fetch CSV files.";
-    throw new Error(detail);
+    throw new Error(errorDetail(responseJson, "Unable to fetch CSV files."));
   }
 
   if (!("files" in responseJson) || !Array.isArray(responseJson.files)) {
@@ -133,18 +132,10 @@ export async function uploadCsvFile(file: File): Promise<CsvFileUploadResponse> 
     body: formData,
   });
 
-  const responseJson = (await response.json()) as
-    | CsvFileUploadResponse
-    | {
-        detail?: string;
-      };
+  const responseJson = await readResponsePayload<CsvFileUploadResponse>(response, "Unable to upload CSV file.");
 
   if (!response.ok) {
-    const detail =
-      "detail" in responseJson && typeof responseJson.detail === "string"
-        ? responseJson.detail
-        : "Unable to upload CSV file.";
-    throw new Error(detail);
+    throw new Error(errorDetail(responseJson, "Unable to upload CSV file."));
   }
 
   if (

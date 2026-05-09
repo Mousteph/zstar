@@ -15,6 +15,9 @@ interface AppHeaderProps {
   readonly isStrategiesLoading: boolean;
   readonly strategiesError: string | null;
   readonly themeMode: ThemeMode;
+  readonly canRunBacktest: boolean;
+  readonly canCheckCode: boolean;
+  readonly runDisabledReason?: string;
   readonly onRunBacktest: () => void;
   readonly onCheckCode: () => void;
   readonly onOpenSettings: () => void;
@@ -36,6 +39,9 @@ export function AppHeader({
   isStrategiesLoading,
   strategiesError,
   themeMode,
+  canRunBacktest,
+  canCheckCode,
+  runDisabledReason,
   onRunBacktest,
   onCheckCode,
   onOpenSettings,
@@ -164,7 +170,7 @@ export function AppHeader({
             variant="ghost"
             className={`${HEADER_ACTION_CLASS_NAME} gap-2 px-3`}
             onClick={onCheckCode}
-            disabled={isRunning || isValidating}
+            disabled={!canCheckCode}
           >
             {isValidating ? "Checking..." : "Check Code"}
           </Button>
@@ -174,7 +180,8 @@ export function AppHeader({
             variant="ghost"
             className={`${HEADER_ACTION_CLASS_NAME} gap-2 px-3`}
             onClick={onRunBacktest}
-            disabled={isRunning || isValidating}
+            disabled={!canRunBacktest}
+            title={runDisabledReason ?? "Run backtest"}
           >
             <Play className="h-4 w-4" />
             {isRunning ? "Running..." : "Run Backtest"}

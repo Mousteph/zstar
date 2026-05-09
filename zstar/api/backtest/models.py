@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Dict, List, Optional, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -18,8 +19,8 @@ class CsvDataLoaderConfigModel(BaseDataLoaderConfigModel):
 class YahooDataLoaderConfigModel(BaseDataLoaderConfigModel):
     source: Literal["yahoo"] = "yahoo"
     symbol: str = Field(min_length=1, max_length=20)
-    start_date: str | None = Field(default=None)
-    end_date: str | None = Field(default=None)
+    start_date: date | None = Field(default=None)
+    end_date: date | None = Field(default=None)
     interval: str = Field(default="1d")
 
     @field_validator("symbol")

@@ -30,6 +30,51 @@ const TRADE_SIDE_BADGE_STYLES: Record<TradeSide, string> = {
   SHORT: "bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.2)]",
 };
 
+const SOURCE_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/;
+
+interface SourceTimestampParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  hasTime: boolean;
+}
+
+function parseSourceTimestamp(value: string): SourceTimestampParts | null {
+  const match = SOURCE_TIMESTAMP_PATTERN.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day, hour, minute, second] = match;
+  const parts = {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: hour === undefined ? 0 : Number(hour),
+    minute: minute === undefined ? 0 : Number(minute),
+    second: second === undefined ? 0 : Number(second),
+    hasTime: hour !== undefined,
+  };
+
+  return Object.values(parts).every((part) => typeof part === "boolean" || Number.isFinite(part))
+    ? parts
+    : null;
+}
+
+export function sourceTimestampToUtcMilliseconds(value: string): number | null {
+  const parts = parseSourceTimestamp(value);
+  if (!parts) {
+    const fallback = new Date(value).getTime();
+    return Number.isFinite(fallback) ? fallback : null;
+  }
+
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
 export function formatCurrency(value: number): string {
   return value.toLocaleString("en-US", {
     style: "currency",
@@ -49,11 +94,24 @@ export function formatPercent(value: number): string {
 }
 
 export function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const milliseconds = sourceTimestampToUtcMilliseconds(value);
+  if (milliseconds === null) {
     return value;
   }
-  return date.toLocaleString();
+
+  const parts = parseSourceTimestamp(value);
+  const options: Intl.DateTimeFormatOptions = parts?.hasTime
+    ? {
+        dateStyle: "short",
+        timeStyle: "medium",
+        timeZone: "UTC",
+      }
+    : {
+        dateStyle: "short",
+        timeZone: "UTC",
+      };
+
+  return new Intl.DateTimeFormat(undefined, options).format(new Date(milliseconds));
 }
 
 export function getKpiToneStyles(tone: KpiMetricTone): ToneStyles {

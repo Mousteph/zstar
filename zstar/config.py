@@ -108,10 +108,8 @@ class PathsConfig(BaseModel):
         resolved = resolved.resolve()
 
         if not resolved.exists():
-            raise ValueError(
-                "paths.data_dir must point to an existing directory. "
-                "Expected format: relative or absolute path. Example: data"
-            )
+            resolved.mkdir(parents=True, exist_ok=True)
+
         if not resolved.is_dir():
             raise ValueError(
                 "paths.data_dir must point to a directory. "

@@ -18,7 +18,7 @@ import {
 
 import { ActionIconButton } from "@/components/molecules/ActionIconButton";
 import { ExpandableSection } from "@/components/molecules/ExpandableSection";
-import { formatCurrency, formatDateTime, formatNumber } from "@/features/backtest/utils";
+import { formatCurrency, formatDateTime, formatNumber, sourceTimestampToUtcMilliseconds } from "@/features/backtest/utils";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { readCssVariable } from "@/lib/dom/readCssVariable";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,7 @@ type LineSeriesApi = ReturnType<IChartApi["addLineSeries"]>;
 interface MarketOhlcvChartProps {
   readonly data: MarketOhlcvPoint[];
   readonly trades: Trade[];
+  readonly riskOverlayTrades?: Trade[];
   readonly themeMode: ThemeMode;
 }
 
@@ -43,6 +44,7 @@ interface PreparedMarketData {
   readonly candles: CandlestickData[];
   readonly volumes: HistogramData[];
   readonly volumeByTime: Map<number, number>;
+  readonly labelByTime: Map<number, string>;
 }
 
 interface TradeEvent {
@@ -53,6 +55,7 @@ interface TradeEvent {
 interface CandleTooltipState {
   readonly left: number;
   readonly top: number;
+  readonly datetime: string;
   readonly candle: CandlestickData;
   readonly volume: number | null;
   readonly tradeEvents: TradeEvent[];
@@ -73,8 +76,8 @@ interface ChartPalette {
 }
 
 function parseTimestamp(value: string): UTCTimestamp | null {
-  const milliseconds = new Date(value).getTime();
-  if (!Number.isFinite(milliseconds)) {
+  const milliseconds = sourceTimestampToUtcMilliseconds(value);
+  if (milliseconds === null) {
     return null;
   }
 
@@ -127,11 +130,16 @@ function getChartPalette(): ChartPalette {
 }
 
 function prepareMarketData(data: MarketOhlcvPoint[], palette: ChartPalette): PreparedMarketData {
-  const sortedData = [...data].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+  const sortedData = [...data].sort(
+    (a, b) =>
+      (sourceTimestampToUtcMilliseconds(a.datetime) ?? 0) -
+      (sourceTimestampToUtcMilliseconds(b.datetime) ?? 0),
+  );
 
   const candles: CandlestickData[] = [];
   const volumes: HistogramData[] = [];
   const volumeByTime = new Map<number, number>();
+  const labelByTime = new Map<number, string>();
   let lastTime: number | null = null;
 
   for (const point of sortedData) {
@@ -171,10 +179,11 @@ function prepareMarketData(data: MarketOhlcvPoint[], palette: ChartPalette): Pre
       volumeByTime.set(numericTime, point.volume);
     }
 
+    labelByTime.set(numericTime, point.datetime);
     lastTime = numericTime;
   }
 
-  return { candles, volumes, volumeByTime };
+  return { candles, volumes, volumeByTime, labelByTime };
 }
 
 function buildTradeEventsByTime(trades: Trade[]): Map<number, TradeEvent[]> {
@@ -243,8 +252,8 @@ function buildTradeMarkers(trades: Trade[], palette: ChartPalette): SeriesMarker
     .sort((a, b) => Number(a.time) - Number(b.time));
 }
 
-function createRiskLineData(trade: Trade, price: number | null): LineData<Time>[] | null {
-  if (!isValidNumber(price)) {
+function createRiskSegmentData(trade: Trade, price: number | null): LineData<Time>[] | null {
+  if (!isValidNumber(price) || price <= 0) {
     return null;
   }
 
@@ -254,13 +263,25 @@ function createRiskLineData(trade: Trade, price: number | null): LineData<Time>[
     return null;
   }
 
+  if (Number(entryTime) <= Number(exitTime)) {
+    return [
+      { time: entryTime, value: price },
+      { time: exitTime, value: price },
+    ];
+  }
+
   return [
-    { time: entryTime, value: price },
     { time: exitTime, value: price },
+    { time: entryTime, value: price },
   ];
 }
 
-export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhlcvChartProps>) {
+export function MarketOhlcvChart({
+  data,
+  trades,
+  riskOverlayTrades,
+  themeMode,
+}: Readonly<MarketOhlcvChartProps>) {
   const inlineContainerRef = useRef<HTMLDivElement | null>(null);
   const expandedContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -274,9 +295,9 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
 
   const palette = useMemo(() => getChartPalette(), [themeMode, isExpanded]);
   const preparedData = useMemo(() => prepareMarketData(data, palette), [data, palette]);
+  const tradesForRiskOverlay = riskOverlayTrades ?? trades;
   const tradeMarkers = useMemo(() => buildTradeMarkers(trades, palette), [trades, palette]);
   const tradeEventsByTime = useMemo(() => buildTradeEventsByTime(trades), [trades]);
-
   useScrollLock(isExpanded);
 
   useEffect(() => {
@@ -408,6 +429,7 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
             close: candle.close,
           },
           volume: preparedData.volumeByTime.get(numericTime) ?? null,
+          datetime: preparedData.labelByTime.get(numericTime) ?? String(param.time),
           tradeEvents: tradeEventsByTime.get(numericTime) ?? [],
         });
       };
@@ -473,7 +495,16 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
       volumeSeriesRef.current = null;
       riskLineSeriesRef.current = [];
     };
-  }, [isExpanded, palette, preparedData.volumeByTime, tradeEventsByTime]);
+  }, [
+    isExpanded,
+    palette,
+    preparedData.volumeByTime,
+    preparedData.labelByTime,
+    tradeEventsByTime,
+    tradeMarkers,
+    tradesForRiskOverlay,
+    barSpacing,
+  ]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -496,41 +527,40 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
     } catch {
       setChartInitError("Unable to render market chart data.");
     }
-  }, [preparedData, tradeMarkers]);
+  }, [preparedData, tradeMarkers, tradesForRiskOverlay, palette]);
 
   const renderRiskLineSeries = (chart: IChartApi) => {
     for (const series of riskLineSeriesRef.current) {
       chart.removeSeries(series);
     }
-
     riskLineSeriesRef.current = [];
 
-    for (const trade of trades) {
-      const riskLines = [
+    for (const trade of tradesForRiskOverlay) {
+      const seriesDefinitions = [
         {
-          data: createRiskLineData(trade, trade.take_profit_price),
           color: palette.takeProfitColor,
+          data: createRiskSegmentData(trade, trade.take_profit_price),
         },
         {
-          data: createRiskLineData(trade, trade.stop_loss_price),
           color: palette.stopLossColor,
+          data: createRiskSegmentData(trade, trade.stop_loss_price),
         },
       ];
 
-      for (const riskLine of riskLines) {
-        if (riskLine.data === null) {
+      for (const seriesDefinition of seriesDefinitions) {
+        if (seriesDefinition.data === null) {
           continue;
         }
 
         const series = chart.addLineSeries({
-          color: riskLine.color,
+          color: seriesDefinition.color,
           lineWidth: 2,
           lastValueVisible: false,
           priceLineVisible: false,
           crosshairMarkerVisible: false,
         });
         series.applyOptions({ priceScaleId: "right" });
-        series.setData(riskLine.data);
+        series.setData(seriesDefinition.data);
         riskLineSeriesRef.current.push(series);
       }
     }
@@ -615,9 +645,7 @@ export function MarketOhlcvChart({ data, trades, themeMode }: Readonly<MarketOhl
             style={{ left: tooltipState.left, top: tooltipState.top }}
           >
             <p className="mb-1 truncate text-[0.68rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              {typeof tooltipState.candle.time === "number"
-                ? formatDateTime(new Date(tooltipState.candle.time * 1000).toISOString())
-                : String(tooltipState.candle.time)}
+              {formatDateTime(tooltipState.datetime)}
             </p>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               <span className="text-muted-foreground">Open</span>
