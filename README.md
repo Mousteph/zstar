@@ -1,26 +1,30 @@
-https://github.com/user-attachments/assets/91c7c6b0-fa99-4624-80f1-5554134992d2
-
 # Z* (ZStar)
 
-Lightweight backtesting framework for running Python trading strategies from a FastAPI backend, a Next.js web UI, or programmatic Python imports.
+Lightweight backtesting framework for running Python trading strategies from a FastAPI backend, a Next.js web UI, or direct Python imports.
+
+## Documentation
+
+- [Core strategy contract](docs/core-strategy.md)
+- [Backtest engine flow](docs/engine.md)
+- [Backtesting metrics reference](docs/metrics.md)
 
 ## What It Solves
 
-ZStar gives you a small local workflow for testing a strategy against historical market data without building your own engine, API, and dashboard first.
+ZStar gives you a local workflow for testing a trading strategy against historical market data without having to build the engine, API, and dashboard yourself.
 
 ## How It Works
 
 1. You define a Python strategy class that inherits from `CoreStrategy`.
-2. ZStar loads OHLCV data from Yahoo Finance.
-3. The backtest engine applies your signals, position sizing, fees, and slippage.
-4. Results are returned in the UI/API and can also be consumed directly from Python objects.
+2. ZStar loads OHLCV data from Yahoo Finance or from a CSV file.
+3. The backtest engine applies your signals, position sizing, fees, and slippage bar by bar.
+4. Results are returned as KPIs, trades, market candles, and an equity curve.
 
 ## Main Capabilities
 
 - Run backtests from the web UI or Python code
-- Load strategy code dynamically
-- Configure fees, slippage, seed, balance, symbol, and date range
-- Return KPIs, trades, market candles, and equity curve data
+- Load strategy files dynamically and validate them before execution
+- Configure balance, fees, slippage, seed, symbol, and date range
+- Inspect KPIs, trades, market data, and equity curve output
 
 ## Prerequisites
 
@@ -39,13 +43,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`config.yaml` controls backend/frontend host settings, API proxying, CORS origins, and strategy paths.
+The repository expects a `config.yaml` file in the project root by default.
 
 ## Quick Start
 
-This project now supports WebUI access and programmatic Python imports only.
+### Docker Compose
 
-### Web UI with Docker (recommended)
+The easiest way to run the full stack is:
 
 ```bash
 docker compose up --build
@@ -54,15 +58,28 @@ docker compose up --build
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8000`
 
-## Local Development
+### Backend Only
 
-Backend:
+Run the FastAPI backend directly with the default config:
+
+```bash
+python -m zstar
+```
+
+You can also pass an explicit config path:
+
+```bash
+python -m zstar custom-config.yaml
+```
+
+The equivalent API module entrypoint is also available:
 
 ```bash
 python -m zstar.api
+python -m zstar.api custom-config.yaml
 ```
 
-Frontend:
+### Frontend Only
 
 ```bash
 cd webui
@@ -70,18 +87,11 @@ npm ci
 node scripts/start-next.mjs dev
 ```
 
-The Next.js dev server proxies `/api` requests to the `frontend.backend_proxy_url` value in your config file.
-For local frontend development outside Docker, set `frontend.backend_proxy_url` to `http://localhost:8000`.
+When the frontend runs outside Docker, set `frontend.backend_proxy_url` to `http://localhost:8000` so the Next.js server can proxy `/api/...` requests to the backend.
 
-## How to Configure Your Instance
+## Configuration
 
-ZStar reads `config.yaml` on startup. Docker mounts the repository `config.yaml` as `/app/config.yaml`, and local commands read the same file by default.
-
-```bash
-python -m zstar.api
-```
-
-Configuration files use this schema:
+ZStar loads `config.yaml` on startup. Docker mounts the repository config into both containers, and local commands read the same file by default.
 
 ```yaml
 backend:
@@ -89,12 +99,14 @@ backend:
   port: 8000
   allow_origins:
     - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
 frontend:
   host: "0.0.0.0"
   port: 3000
   backend_proxy_url: "http://backend:8000"
 paths:
   strategies_dir: "strategies"
+  data_dir: "data"
   default_strategy_name: "default_strategy"
 logging:
   level: "DEBUG"
@@ -105,39 +117,41 @@ logging:
   stdout: true
 ```
 
-- `backend.host` and `backend.port` control the FastAPI server.
-- `backend.allow_origins` controls CORS origins and must contain full `http://` or `https://` origins.
-- `frontend.host` and `frontend.port` control the Next.js Docker startup values.
-- `frontend.backend_proxy_url` is the backend URL the Next.js server uses when proxying browser `/api/...` requests.
-- `paths.strategies_dir` points to the directory containing strategy files.
-- `paths.default_strategy_name` is the strategy filename stem used when an API request does not provide one.
-- `logging.level` sets the minimum log level to emit.
-- `logging.directory` and `logging.filename` define where rotated log files are written.
-- `logging.max_bytes` and `logging.backup_count` configure rotation (default `10MB`, keep `5` files).
-- `logging.stdout` controls whether logs are also emitted to stdout.
+### Config Fields
 
-Docker has one supported startup command:
+| Field | Purpose | Notes |
+| --- | --- | --- |
+| `backend.host` | Bind address for the FastAPI server | Use `0.0.0.0` in Docker or local network access. |
+| `backend.port` | Backend port | Must be an integer from `1` to `65535`. |
+| `backend.allow_origins` | CORS allow-list | Use full `http://` or `https://` origins. |
+| `frontend.host` | Bind address for the Next.js server | Usually `0.0.0.0` in Docker. |
+| `frontend.port` | Frontend port | Must be an integer from `1` to `65535`. |
+| `frontend.backend_proxy_url` | Backend URL used by the frontend proxy | Use `http://backend:8000` in Docker and `http://localhost:8000` for local frontend development. |
+| `paths.strategies_dir` | Directory that stores strategy files | Must already exist on disk. |
+| `paths.data_dir` | Directory that stores local data files | Created automatically if it does not exist. |
+| `paths.default_strategy_name` | Default strategy filename stem | Used when a request does not provide a strategy name. |
+| `logging.level` | Minimum log level | One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
+| `logging.directory` | Directory for log files | Relative paths are resolved from the config file location. |
+| `logging.filename` | Log filename | Must be a base filename, not a path. |
+| `logging.max_bytes` | Rotation threshold | Default is `10 MB`. |
+| `logging.backup_count` | Number of rotated log files to keep | Default is `5`. |
+| `logging.stdout` | Mirror logs to stdout | Useful in Docker and during development. |
 
-```bash
-docker compose up --build
-```
+### Configuration Notes
 
-Compose mounts `config.yaml` as `/app/config.yaml` for both backend and frontend containers.
-When using Docker, keep `backend.port` at `8000` and `frontend.port` at `3000`, or update the matching Compose `ports` mappings at the same time. Docker Compose can read a `.env` file for variable interpolation, but it cannot read values directly out of `config.yaml`; using both would create two config sources that can drift.
-
-Config validation fails fast. Common fixes:
-
-- Missing config: make sure `config.yaml` exists in the repository root.
-- Invalid URL: include the scheme, for example `http://localhost:3000`.
-- Invalid port: use an integer from `1` to `65535`, for example `8000`.
-- Invalid strategy path: make sure `paths.strategies_dir` points to an existing directory.
+- `paths.strategies_dir` must point to a real directory before startup succeeds.
+- `paths.data_dir` is created automatically if it does not exist.
+- When using Docker, keep `backend.port` at `8000` and `frontend.port` at `3000`, or update the Compose port mappings at the same time.
+- `backend.allow_origins` should include every browser origin that needs to call the API.
 
 ## Use From Python
 
+You can run the backtester directly from code without the web UI.
+
 ```python
-from zstar import CoreStrategy
-from zstar.core.backtest import BacktesterEngine, BacktestConfigModel
-from zstar.core.data_loader import DataLoaderConfigModel, YahooData
+from zstar import CoreStrategy, BacktesterEngine
+from zstar.core.backtest import BacktestConfigModel
+from zstar.core.data_loader import YahooData
 
 
 class BuyAndHoldStrategy(CoreStrategy):
@@ -155,7 +169,7 @@ class BuyAndHoldStrategy(CoreStrategy):
         return round(balance / entry_price, 4)
 
 
-data_config = DataLoaderConfigModel(
+data_handler = YahooData(
     symbol="AAPL",
     start_date="2024-01-01",
     end_date="2025-01-01",
@@ -170,14 +184,16 @@ backtest_config = BacktestConfigModel(
     slippage_seed=42,
 )
 
-engine = BacktesterEngine(BuyAndHoldStrategy(), YahooData(data_config), backtest_config)
+engine = BacktesterEngine(BuyAndHoldStrategy(), data_handler, backtest_config)
 report = engine.run_backtest()
 
 print(report.kpis())
 print(report.equity_curve().tail())
 ```
 
-For dynamic strategy files used by the UI or API, define exactly one `CoreStrategy` subclass and ZStar will inject `CoreStrategy`, `pd`, and `np` automatically.
+If you want to load strategy code dynamically, import `load_strategy_from_code` from `zstar.core.strategy` and make sure the code defines exactly one `CoreStrategy` subclass.
+
+The repository also includes `strategies/default_strategy.py` as a reference strategy implementation.
 
 ## Validation
 
@@ -185,10 +201,10 @@ For dynamic strategy files used by the UI or API, define exactly one `CoreStrate
 python -m pytest -q
 ```
 
-## Roadmap
+## Reference Docs
 
-Planned directions for ZStar:
+Use these pages when you want the implementation details instead of the quick start:
 
-- Support additional market data sources beyond Yahoo Finance
-- Add paper trading and live monitoring workflows
-- Add optimization tools such as parameter tuning and walk-forward testing
+- [`docs/core-strategy.md`](docs/core-strategy.md)
+- [`docs/engine.md`](docs/engine.md)
+- [`docs/metrics.md`](docs/metrics.md)
