@@ -9,6 +9,7 @@ import {
   getTradePnlClassName,
   getTradeRowClassName,
   getTradeSideBadgeClassName,
+  sourceTimestampToUtcMilliseconds,
 } from "@/features/backtest/utils";
 import type { Trade } from "@/types/backtest";
 
@@ -24,7 +25,9 @@ export function RecentTradesTable({
   onSelectedTradeIdChange,
 }: Readonly<RecentTradesTableProps>) {
   const sortedTrades = [...trades].sort(
-    (a, b) => new Date(b.exit_datetime).getTime() - new Date(a.exit_datetime).getTime(),
+    (a, b) =>
+      (sourceTimestampToUtcMilliseconds(b.exit_datetime) ?? 0) -
+      (sourceTimestampToUtcMilliseconds(a.exit_datetime) ?? 0),
   );
 
   const toggleSelectedTrade = (tradeId: string) => {

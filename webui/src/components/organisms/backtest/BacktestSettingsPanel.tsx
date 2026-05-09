@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Upload, X } from "lucide-react";
 
 import { Button } from "@/components/atoms/Button";
@@ -21,13 +21,54 @@ interface BacktestSettingsPanelProps {
   readonly onUploadCsv: (file: File) => Promise<void>;
 }
 
-function updateNumberField(value: string, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+type NumericFieldName = "initialBalance" | "entryFeePct" | "exitFeePct" | "slippagePct";
+
+interface NumericFieldConfig {
+  label: string;
+  min: number;
+  max?: number;
 }
+
+const NUMERIC_FIELD_CONFIG: Record<NumericFieldName, NumericFieldConfig> = {
+  initialBalance: { label: "Initial balance", min: 0 },
+  entryFeePct: { label: "Entry fee %", min: 0, max: 100 },
+  exitFeePct: { label: "Exit fee %", min: 0, max: 100 },
+  slippagePct: { label: "Slippage %", min: 0, max: 100 },
+};
 
 const SETTINGS_FIELD_CLASS_NAME =
   "w-full rounded-lg border border-border/80 bg-background/80 px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-ring";
+
+function normalizeNumberInput(value: string): string {
+  return value.trim().replaceAll(",", ".");
+}
+
+function parseEditableNumber(value: string): number | null {
+  const normalized = normalizeNumberInput(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function validateNumericDraft(field: NumericFieldName, value: string): string | null {
+  const parsed = parseEditableNumber(value);
+  const config = NUMERIC_FIELD_CONFIG[field];
+
+  if (parsed === null) {
+    return `${config.label} must be a numeric value.`;
+  }
+  if (parsed < config.min) {
+    return `${config.label} must be greater than or equal to ${config.min}.`;
+  }
+  if (config.max !== undefined && parsed > config.max) {
+    return `${config.label} must be less than or equal to ${config.max}.`;
+  }
+
+  return null;
+}
 
 export function BacktestSettingsPanel({
   isOpen,
@@ -42,6 +83,16 @@ export function BacktestSettingsPanel({
   onUploadCsv,
 }: Readonly<BacktestSettingsPanelProps>) {
   useScrollLock(isOpen);
+  const [numericDrafts, setNumericDrafts] = useState<Record<NumericFieldName, string>>({
+    initialBalance: String(settings.initialBalance),
+    entryFeePct: String(settings.entryFeePct),
+    exitFeePct: String(settings.exitFeePct),
+    slippagePct: String(settings.slippagePct),
+  });
+  const [slippageSeedDraft, setSlippageSeedDraft] = useState(settings.slippageSeed);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<NumericFieldName | "slippageSeed", string>>>({});
+
+  const hasFieldErrors = useMemo(() => Object.values(fieldErrors).some(Boolean), [fieldErrors]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -67,6 +118,67 @@ export function BacktestSettingsPanel({
 
     void onLoadCsvFiles();
   }, [isOpen, onLoadCsvFiles]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setNumericDrafts({
+      initialBalance: String(settings.initialBalance),
+      entryFeePct: String(settings.entryFeePct),
+      exitFeePct: String(settings.exitFeePct),
+      slippagePct: String(settings.slippagePct),
+    });
+    setSlippageSeedDraft(settings.slippageSeed);
+    setFieldErrors({});
+  }, [isOpen, settings]);
+
+  const updateNumericDraft = (field: NumericFieldName, value: string) => {
+    setNumericDrafts((currentDrafts) => ({ ...currentDrafts, [field]: value }));
+  };
+
+  const applyNumericDraft = (field: NumericFieldName) => {
+    const error = validateNumericDraft(field, numericDrafts[field]);
+    if (error) {
+      setFieldErrors((currentErrors) => ({ ...currentErrors, [field]: error }));
+      return;
+    }
+
+    const parsed = parseEditableNumber(numericDrafts[field]);
+    if (parsed === null) {
+      return;
+    }
+
+    setFieldErrors((currentErrors) => ({ ...currentErrors, [field]: undefined }));
+    onSettingsChange({
+      ...settings,
+      [field]: parsed,
+    });
+    setNumericDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [field]: String(parsed),
+    }));
+  };
+
+  const applySlippageSeedDraft = () => {
+    const trimmedValue = slippageSeedDraft.trim();
+    const isValidSeed = !trimmedValue || Number.isInteger(Number(trimmedValue));
+    if (!isValidSeed) {
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        slippageSeed: "Slippage seed must be an integer.",
+      }));
+      return;
+    }
+
+    setFieldErrors((currentErrors) => ({ ...currentErrors, slippageSeed: undefined }));
+    onSettingsChange({
+      ...settings,
+      slippageSeed: trimmedValue,
+    });
+    setSlippageSeedDraft(trimmedValue);
+  };
 
   if (!isOpen) {
     return null;
@@ -240,52 +352,47 @@ export function BacktestSettingsPanel({
             <label className="block">
               <span className="mb-1.5 block text-sm text-muted-foreground">Initial Balance</span>
               <input
-                type="number"
-                min={1}
-                value={settings.initialBalance}
-                onChange={(event) =>
-                  onSettingsChange({
-                    ...settings,
-                    initialBalance: updateNumberField(event.target.value, settings.initialBalance),
-                  })
-                }
+                type="text"
+                inputMode="decimal"
+                value={numericDrafts.initialBalance}
+                onChange={(event) => updateNumericDraft("initialBalance", event.target.value)}
+                onBlur={() => applyNumericDraft("initialBalance")}
                 className={SETTINGS_FIELD_CLASS_NAME}
               />
+              {fieldErrors.initialBalance ? (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.initialBalance}</p>
+              ) : null}
             </label>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-1.5 block text-sm text-muted-foreground">Entry Fee %</span>
                 <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={settings.entryFeePct}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      ...settings,
-                      entryFeePct: updateNumberField(event.target.value, settings.entryFeePct),
-                    })
-                  }
+                  type="text"
+                  inputMode="decimal"
+                  value={numericDrafts.entryFeePct}
+                  onChange={(event) => updateNumericDraft("entryFeePct", event.target.value)}
+                  onBlur={() => applyNumericDraft("entryFeePct")}
                   className={SETTINGS_FIELD_CLASS_NAME}
                 />
+                {fieldErrors.entryFeePct ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.entryFeePct}</p>
+                ) : null}
               </label>
 
               <label className="block">
                 <span className="mb-1.5 block text-sm text-muted-foreground">Exit Fee %</span>
                 <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={settings.exitFeePct}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      ...settings,
-                      exitFeePct: updateNumberField(event.target.value, settings.exitFeePct),
-                    })
-                  }
+                  type="text"
+                  inputMode="decimal"
+                  value={numericDrafts.exitFeePct}
+                  onChange={(event) => updateNumericDraft("exitFeePct", event.target.value)}
+                  onBlur={() => applyNumericDraft("exitFeePct")}
                   className={SETTINGS_FIELD_CLASS_NAME}
                 />
+                {fieldErrors.exitFeePct ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.exitFeePct}</p>
+                ) : null}
               </label>
             </div>
 
@@ -293,36 +400,39 @@ export function BacktestSettingsPanel({
               <label className="block">
                 <span className="mb-1.5 block text-sm text-muted-foreground">Slippage %</span>
                 <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={settings.slippagePct}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      ...settings,
-                      slippagePct: updateNumberField(event.target.value, settings.slippagePct),
-                    })
-                  }
+                  type="text"
+                  inputMode="decimal"
+                  value={numericDrafts.slippagePct}
+                  onChange={(event) => updateNumericDraft("slippagePct", event.target.value)}
+                  onBlur={() => applyNumericDraft("slippagePct")}
                   className={SETTINGS_FIELD_CLASS_NAME}
                 />
+                {fieldErrors.slippagePct ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.slippagePct}</p>
+                ) : null}
               </label>
 
               <label className="block">
                 <span className="mb-1.5 block text-sm text-muted-foreground">Slippage Seed</span>
                 <input
-                  value={settings.slippageSeed}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      ...settings,
-                      slippageSeed: event.target.value,
-                    })
-                  }
+                  value={slippageSeedDraft}
+                  onChange={(event) => setSlippageSeedDraft(event.target.value)}
+                  onBlur={applySlippageSeedDraft}
                   className={SETTINGS_FIELD_CLASS_NAME}
                   placeholder="optional"
                 />
+                {fieldErrors.slippageSeed ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.slippageSeed}</p>
+                ) : null}
               </label>
             </div>
           </div>
+
+          {hasFieldErrors ? (
+            <p className="mt-4 text-sm text-destructive">
+              Some values are invalid. Fix the highlighted fields before running a backtest.
+            </p>
+          ) : null}
 
           <div className="mt-7">
             <Button
