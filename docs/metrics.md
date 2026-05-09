@@ -2,7 +2,9 @@
 
 ## Overview
 
-ZStar reports strategy, trade, and buy-and-hold metrics from a completed backtest. Strategy equity is reconstructed by starting with `initial_balance`, realizing each closed trade's `net_pnl` at its exit timestamp, and marking open trades to the current close price between entry and exit. Buy-and-hold equity assumes the full initial balance is invested at the very first bar's close and held through the final close; if that close is non-positive, no buy-and-hold curve is produced.
+ZStar reports strategy, trade, and buy-and-hold metrics from a completed backtest. This reference mirrors `BacktestReport.kpis()` so each formula matches the implementation.
+
+Strategy equity is reconstructed by starting with `initial_balance`, realizing each closed trade's `net_pnl` at its exit timestamp, and marking open trades to the current close price between entry and exit. Buy-and-hold equity assumes the full initial balance is invested at the very first bar's close and held through the final close; if that close is non-positive, no buy-and-hold curve is produced.
 
 All percentage return and drawdown values are expressed in percent points, not decimals. For example, `12.5` means 12.5%.
 
