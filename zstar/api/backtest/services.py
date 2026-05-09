@@ -10,6 +10,7 @@ import pandas as pd
 
 from zstar.api.utils import resolve_strategy_file
 from zstar.core.backtest import BacktestReport
+from zstar.core.exceptions import StrategyValidationError
 from zstar.core.strategy import CoreStrategy, ValidateStrategy
 from zstar.core.trade_order import Trade
 
@@ -30,6 +31,9 @@ class StrategyValidationPayload:
 
 
 def resolve_strategy_validation(strategy_filename: Optional[str]) -> StrategyValidationPayload:
+    if strategy_filename is None or not strategy_filename.strip():
+        raise StrategyValidationError("Strategy filename is required. Select a strategy file before running a backtest.")
+
     strategy_path = resolve_strategy_file(strategy_filename)
     validator = ValidateStrategy(strategy_path=strategy_path)
     strategy, validation_result = validator.validate_file()

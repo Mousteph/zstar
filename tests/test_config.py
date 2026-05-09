@@ -29,7 +29,6 @@ def _write_config(path: Path, strategies_dir: Path, data_dir: Path, **overrides:
                 "paths:",
                 f'  strategies_dir: "{strategies_dir}"',
                 f'  data_dir: "{data_dir}"',
-                '  default_strategy_name: "default_strategy"',
                 extra,
             ]
         ),
@@ -96,7 +95,6 @@ def test_load_config_raises_clear_error_for_missing_required_field(tmp_path):
                 "paths:",
                 f'  strategies_dir: "{strategies_dir}"',
                 f'  data_dir: "{data_dir}"',
-                '  default_strategy_name: "default_strategy"',
             ]
         ),
         encoding="utf-8",
@@ -220,7 +218,6 @@ def test_get_settings_shim_uses_canonical_config_loader(tmp_path):
     settings = get_settings(config_path)
 
     assert settings.backend.port == 8000
-    assert settings.paths.default_strategy_name == "default_strategy"
 
 
 def test_load_config_uses_explicit_logging_level(tmp_path):
@@ -245,7 +242,6 @@ def test_load_config_uses_explicit_logging_level(tmp_path):
                 "paths:",
                 f'  strategies_dir: "{strategies_dir}"',
                 f'  data_dir: "{data_dir}"',
-                '  default_strategy_name: "default_strategy"',
                 "logging:",
                 '  level: "ERROR"',
                 '  directory: "logs"',

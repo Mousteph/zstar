@@ -78,7 +78,6 @@ class PathsConfig(BaseModel):
 
     strategies_dir: Path = Field(...)
     data_dir: Path = Field(...)
-    default_strategy_name: str = Field(..., min_length=1, pattern=r"^[A-Za-z0-9_-]+$")
 
     @field_validator("strategies_dir")
     @classmethod
@@ -172,10 +171,9 @@ FIELD_HINTS = {
     "frontend.host": "Expected non-empty hostname or IP address. Example: 0.0.0.0",
     "frontend.port": "Expected integer from 1 to 65535. Example: 3000",
     "frontend.backend_proxy_url": "Expected HTTP(S) URL. Example: http://backend:8000",
-    "paths": "Expected object with strategies_dir, data_dir, and default_strategy_name. Example: paths: {strategies_dir: 'strategies', data_dir: 'data', default_strategy_name: 'default_strategy'}",
+    "paths": "Expected object with strategies_dir and data_dir. Example: paths: {strategies_dir: 'strategies', data_dir: 'data'}",
     "paths.strategies_dir": "Expected existing directory path. Example: strategies",
     "paths.data_dir": "Expected existing directory path. Example: data",
-    "paths.default_strategy_name": "Expected base filename without extension. Example: default_strategy",
     "logging": "Expected object with level, directory, filename, max_bytes, backup_count, and stdout.",
     "logging.level": "Expected one of: DEBUG, INFO, WARNING, ERROR, CRITICAL. Example: INFO",
     "logging.directory": "Expected relative or absolute path. Example: logs",

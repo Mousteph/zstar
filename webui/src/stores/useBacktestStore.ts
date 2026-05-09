@@ -23,8 +23,8 @@ interface BacktestState {
   setSettings: (settings: BacktestSettings) => void;
   loadCsvFiles: () => Promise<void>;
   uploadCsv: (file: File) => Promise<void>;
-  runValidation: (strategyFilename?: string) => Promise<StrategyValidationResult | null>;
-  runCurrentBacktest: (strategyFilename?: string) => Promise<void>;
+  runValidation: (strategyFilename: string) => Promise<StrategyValidationResult | null>;
+  runCurrentBacktest: (strategyFilename: string) => Promise<void>;
 }
 
 function validateNumericSetting(label: string, value: number, min: number, max?: number): string | null {
@@ -129,9 +129,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
     set({ isValidating: true, runStatus: null });
 
     try {
-      const validationResult = await checkStrategyCode(
-        strategyFilename ? { strategy_filename: strategyFilename } : {}
-      );
+      const validationResult = await checkStrategyCode({ strategy_filename: strategyFilename });
 
       set({
         validationResult,
@@ -189,7 +187,7 @@ export const useBacktestStore = create<BacktestState>((set, get) => ({
                 end_date: settings.endDate,
                 interval: settings.interval,
               },
-        ...(strategyFilename ? { strategy_filename: strategyFilename } : {}),
+        strategy_filename: strategyFilename,
         backtest_config: {
           initial_balance: settings.initialBalance,
           entry_fee_pct: settings.entryFeePct,

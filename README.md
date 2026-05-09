@@ -109,7 +109,6 @@ frontend:
 paths:
   strategies_dir: "strategies"
   data_dir: "data"
-  default_strategy_name: "default_strategy"
 logging:
   level: "DEBUG"
   directory: "logs"
@@ -131,7 +130,6 @@ logging:
 | `frontend.backend_proxy_url` | Backend URL used by the frontend proxy | Use `http://backend:8000` in Docker and `http://localhost:8000` for local frontend development. |
 | `paths.strategies_dir` | Directory that stores strategy files | Must already exist on disk. |
 | `paths.data_dir` | Directory that stores local data files | Created automatically if it does not exist. |
-| `paths.default_strategy_name` | Default strategy filename stem | Used when a request does not provide a strategy name. |
 | `logging.level` | Minimum log level | One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
 | `logging.directory` | Directory for log files | Relative paths are resolved from the config file location. |
 | `logging.filename` | Log filename | Must be a base filename, not a path. |
@@ -143,6 +141,7 @@ logging:
 
 - `paths.strategies_dir` must point to a real directory before startup succeeds.
 - `paths.data_dir` is created automatically if it does not exist.
+- Strategy files are discovered from `paths.strategies_dir` and shown to the web UI as a selectable list.
 - When using Docker, keep `backend.port` at `8000` and `frontend.port` at `3000`, or update the Compose port mappings at the same time.
 - `backend.allow_origins` should include every browser origin that needs to call the API.
 
@@ -194,8 +193,6 @@ print(report.equity_curve().tail())
 ```
 
 If you want to load strategy code dynamically, import `load_strategy_from_code` from `zstar.core.strategy` and make sure the code defines exactly one `CoreStrategy` subclass.
-
-The repository also includes `strategies/default_strategy.py` as a reference strategy implementation.
 
 ## Validation
 

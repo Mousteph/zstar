@@ -120,7 +120,9 @@ export function AppHeader({
               aria-haspopup="menu"
               title="Select strategy file"
             >
-              <span className="max-w-[11rem] truncate text-left text-xs font-medium sm:text-sm">{selectedStrategy}</span>
+              <span className="max-w-[11rem] truncate text-left text-xs font-medium sm:text-sm">
+                {selectedStrategy || "Select a strategy"}
+              </span>
               <ChevronDown
                 className={[
                   "h-4 w-4 transition-transform",
@@ -171,6 +173,7 @@ export function AppHeader({
             className={`${HEADER_ACTION_CLASS_NAME} gap-2 px-3`}
             onClick={onCheckCode}
             disabled={!canCheckCode}
+            title={canCheckCode ? "Check code" : "Select a strategy before checking code"}
           >
             {isValidating ? "Checking..." : "Check Code"}
           </Button>
