@@ -1,4 +1,5 @@
-from zstar.core.strategy.validate_strategy import ValidateStrategy, ValidationIssue
+from zstar.core.strategy.validate_strategy import ValidateStrategy
+from zstar.core.strategy.validation_models import ValidationIssue
 
 
 def test_validate_strategy_reports_syntax_error_with_line_number():

@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
 
-import { getAppConfig } from "@/server/read-config.mjs";
+import { getFrontendRuntimeConfig } from "@/server/runtime-config.mjs";
 
 export const runtime = "nodejs";
 
 function backendUrl(path: string[]): string {
-  const backendProxyTarget = getAppConfig().frontend.backend_proxy_url;
+  const backendProxyTarget = getFrontendRuntimeConfig().backendProxyUrl;
   const baseUrl = backendProxyTarget.replace(/\/$/, "");
   return `${baseUrl}/api/${path.map(encodeURIComponent).join("/")}`;
 }

@@ -10,10 +10,6 @@ def _configured_strategies_dir() -> Path:
     return load_config().paths.strategies_dir
 
 
-def _configured_default_strategy_name() -> str:
-    return load_config().paths.default_strategy_name
-
-
 def list_strategy_filenames(strategies_dir: Optional[Path] = None) -> list[str]:
     target_dir = strategies_dir or _configured_strategies_dir()
     if not target_dir.exists():
@@ -28,11 +24,11 @@ def list_strategy_filenames(strategies_dir: Optional[Path] = None) -> list[str]:
 
 def normalize_strategy_filename(strategy_filename: Optional[str]) -> str:
     if strategy_filename is None:
-        return _configured_default_strategy_name()
+        raise StrategyValidationError("Strategy filename is required. Select a strategy file before running a backtest.")
 
     normalized = strategy_filename.strip()
     if not normalized:
-        return _configured_default_strategy_name()
+        raise StrategyValidationError("Strategy filename is required. Select a strategy file before running a backtest.")
 
     if normalized.endswith(PYTHON_FILE_SUFFIX):
         normalized = normalized[: -len(PYTHON_FILE_SUFFIX)].strip()

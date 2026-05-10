@@ -3,6 +3,8 @@ import pandas as pd
 import pytest
 
 from zstar.core.backtest.backtest_report import BacktestReport
+from zstar.core.backtest.backtest_report_timeseries import buy_and_hold_equity_curve
+from zstar.core.backtest.backtest_report_timeseries import strategy_equity_curve
 from zstar.core.enums import TradeSide
 from zstar.core.trade_order import Trade
 
@@ -86,7 +88,7 @@ def test_sharpe_ratio_annualization_uses_interval():
         interval='1h',
     )
 
-    strategy_returns = daily_report._strategy_equity_curve().pct_change().dropna()
+    strategy_returns = strategy_equity_curve(initial_balance, trades, data).pct_change().dropna()
     base_sharpe = strategy_returns.mean() / strategy_returns.std(ddof=1)
     expected_daily = float(base_sharpe * np.sqrt(252.0))
     expected_hourly = float(base_sharpe * np.sqrt(252.0 * 6.5))
@@ -144,7 +146,7 @@ def test_kpis_are_calculated_correctly_for_deterministic_inputs():
     )
 
     kpis = report.kpis()
-    strategy_curve = report._strategy_equity_curve()
+    strategy_curve = strategy_equity_curve(report.initial_balance, report.trades, report.data)
     strategy_returns = strategy_curve.pct_change().dropna()
     expected_sharpe = float((strategy_returns.mean() / strategy_returns.std(ddof=1)) * np.sqrt(252.0))
 
@@ -272,7 +274,7 @@ def test_strategy_equity_curve_marks_open_trade_to_market():
     )
     report = BacktestReport(1000.0, 1037.0, [trade], data)
 
-    assert report._strategy_equity_curve().tolist() == pytest.approx(
+    assert strategy_equity_curve(report.initial_balance, report.trades, report.data).tolist() == pytest.approx(
         [999.0, 1019.0, 979.0, 1037.0],
     )
     assert report.kpis()['max_drawdown_pct'] == pytest.approx(-3.925417075564278)
@@ -315,7 +317,7 @@ def test_sharpe_ratio_subtracts_periodic_risk_free_rate():
         risk_free_rate=0.0252,
     )
 
-    returns = report._strategy_equity_curve().pct_change().dropna()
+    returns = strategy_equity_curve(report.initial_balance, report.trades, report.data).pct_change().dropna()
     expected = ((returns.mean() - (0.0252 / 252.0)) / returns.std(ddof=1)) * np.sqrt(252.0)
 
     assert report.kpis()['sharpe_ratio'] == pytest.approx(float(expected))
@@ -332,7 +334,9 @@ def test_buy_and_hold_handles_non_positive_start_price():
     )
     report = BacktestReport(1000.0, 1000.0, [], data)
     kpis = report.kpis()
+    buy_and_hold_curve = buy_and_hold_equity_curve(report.initial_balance, report.data)
 
     assert kpis['buy_and_hold_final_balance'] == pytest.approx(1000.0)
     assert kpis['buy_and_hold_return_pct'] == pytest.approx(0.0)
     assert kpis['buy_and_hold_max_drawdown_pct'] == pytest.approx(0.0)
+    assert buy_and_hold_curve.empty

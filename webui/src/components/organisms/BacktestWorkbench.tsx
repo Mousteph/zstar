@@ -17,10 +17,9 @@ const EMPTY_MARKET_OHLCV_DATA: MarketOhlcvPoint[] = [];
 const EMPTY_TRADES: Trade[] = [];
 const EMPTY_KPI_METRICS: KpiMetric[] = [];
 const EMPTY_KPI_ROWS: KpiRow[] = [];
-const CONFIGURED_DEFAULT_STRATEGY = "default_strategy";
 
 export function BacktestWorkbench() {
-  const [selectedStrategy, setSelectedStrategy] = useState(CONFIGURED_DEFAULT_STRATEGY);
+  const [selectedStrategy, setSelectedStrategy] = useState("");
   const [strategyOptions, setStrategyOptions] = useState<string[]>([]);
   const [isStrategyMenuOpen, setIsStrategyMenuOpen] = useState(false);
   const [isStrategiesLoading, setIsStrategiesLoading] = useState(false);
@@ -79,15 +78,11 @@ export function BacktestWorkbench() {
 
         setStrategyOptions(strategies);
         setSelectedStrategy((currentStrategy) => {
-          if (strategies.includes(currentStrategy)) {
+          if (currentStrategy && strategies.includes(currentStrategy)) {
             return currentStrategy;
           }
 
-          if (strategies.includes(CONFIGURED_DEFAULT_STRATEGY)) {
-            return CONFIGURED_DEFAULT_STRATEGY;
-          }
-
-          return strategies[0] ?? currentStrategy;
+          return "";
         });
       })
       .catch((error: unknown) => {
@@ -120,17 +115,19 @@ export function BacktestWorkbench() {
     loadStrategies();
   }, [isStrategyMenuOpen, loadStrategies]);
 
-  const selectedStrategyPayload = selectedStrategy.trim() || undefined;
+  const selectedStrategyPayload = selectedStrategy.trim();
 
   const canRunBacktest =
     !isRunning &&
     !isValidating &&
+    Boolean(selectedStrategyPayload) &&
     (settings.dataSource !== "csv" || settings.csvFilename.trim().length > 0);
 
   const canCheckCode = !isRunning && !isValidating && Boolean(selectedStrategyPayload);
 
-  const runDisabledReason =
-    settings.dataSource === "csv" && !settings.csvFilename.trim()
+  const runDisabledReason = !selectedStrategyPayload
+    ? "Select a strategy before running."
+    : settings.dataSource === "csv" && !settings.csvFilename.trim()
       ? "Select or upload a CSV file before running."
       : undefined;
 

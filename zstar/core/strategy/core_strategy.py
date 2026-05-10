@@ -77,4 +77,4 @@ class CoreStrategy(ABC):
 
     @abstractmethod
     def position_size(self, balance: float, entry_price: float) -> float:
-        pass
+        raise NotImplementedError

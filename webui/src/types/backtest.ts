@@ -41,7 +41,7 @@ export interface StrategyValidationResult {
 }
 
 export interface ValidateStrategyRequest {
-  strategy_filename?: string;
+  strategy_filename: string;
 }
 
 export interface BacktestRunRequest {
@@ -57,7 +57,7 @@ export interface BacktestRunRequest {
         source: "csv";
         filename: string;
       };
-  strategy_filename?: string;
+  strategy_filename: string;
   backtest_config: {
     initial_balance: number;
     entry_fee_pct: number;

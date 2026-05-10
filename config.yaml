@@ -4,14 +4,9 @@ backend:
   allow_origins:
     - "http://localhost:3000"
     - "http://127.0.0.1:3000"
-frontend:
-  host: "0.0.0.0"
-  port: 3000
-  backend_proxy_url: "http://backend:8000"
 paths:
   strategies_dir: "strategies"
   data_dir: "data"
-  default_strategy_name: "default_strategy"
 logging:
   level: "DEBUG"
   directory: "logs"
