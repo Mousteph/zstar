@@ -4,7 +4,7 @@ import pandas as pd
 from zstar.core.strategy import CoreStrategy
 
 
-class RSIEMA200LongShortStrategy(CoreStrategy):
+class RSILongShortStrategy(CoreStrategy):
     RSI_PERIOD = 14
     RSI_OVERSOLD = 30.0
     RSI_OVERBOUGHT = 70.0

@@ -51,7 +51,8 @@ class StrategyLoader:
         return scope
 
     def _execute_file_module(self, code: str) -> Dict[str, object]:
-        assert self.strategy_path is not None
+        if self.strategy_path is None:
+            raise ValueError("strategy_path is required for file-based strategy loading")
 
         package_name = f"_zstar_user_strategy_pkg_{uuid.uuid4().hex}"
         module_name = f"{package_name}.{self.strategy_path.stem}"
