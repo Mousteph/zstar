@@ -47,6 +47,15 @@ pip install -r requirements.txt
 
 The repository expects a `config.yaml` file in the project root by default.
 
+## Starter Strategies
+
+The project ships with two ready-to-run strategy files in [`strategies/`](strategies/), so you can open the app and test immediately on first launch:
+
+- [`sma_crossover_long_only.py`](strategies/sma_crossover_long_only.py): long-only SMA crossover with stop loss and balance-based sizing.
+- [`rsi_long_short.py`](strategies/rsi_long_short.py): RSI oversold/overbought strategy, stop loss, take profit, and 10% sizing.
+
+These files are automatically discovered by the backend and shown in the web UI as selectable strategies.
+
 ## Quick Start
 
 ### Docker Compose
