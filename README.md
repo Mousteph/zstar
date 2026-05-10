@@ -1,4 +1,4 @@
-https://github.com/user-attachments/assets/52541fac-0e0f-43ee-9608-85554373bd20
+https://github.com/user-attachments/assets/f0abc3fd-ea67-41d4-819d-9f0c41e9361a
 
 # Z* (ZStar)
 
