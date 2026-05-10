@@ -89,11 +89,15 @@ npm ci
 node scripts/start-next.mjs dev
 ```
 
-When the frontend runs outside Docker, set `frontend.backend_proxy_url` to `http://localhost:8000` so the Next.js server can proxy `/api/...` requests to the backend.
+When the frontend runs outside Docker, set these environment variables before starting Next.js:
+
+- `BACKEND_PROXY_URL=http://localhost:8000`
+- `FRONTEND_HOST=0.0.0.0`
+- `FRONTEND_PORT=3000`
 
 ## Configuration
 
-ZStar loads `config.yaml` on startup. Docker mounts the repository config into both containers, and local commands read the same file by default.
+ZStar loads `config.yaml` on startup for backend settings only. Docker mounts the repository config into the backend container, and the frontend reads its runtime settings from environment variables.
 
 ```yaml
 backend:
@@ -102,10 +106,6 @@ backend:
   allow_origins:
     - "http://localhost:3000"
     - "http://127.0.0.1:3000"
-frontend:
-  host: "0.0.0.0"
-  port: 3000
-  backend_proxy_url: "http://backend:8000"
 paths:
   strategies_dir: "strategies"
   data_dir: "data"
@@ -125,9 +125,6 @@ logging:
 | `backend.host` | Bind address for the FastAPI server | Use `0.0.0.0` in Docker or local network access. |
 | `backend.port` | Backend port | Must be an integer from `1` to `65535`. |
 | `backend.allow_origins` | CORS allow-list | Use full `http://` or `https://` origins. |
-| `frontend.host` | Bind address for the Next.js server | Usually `0.0.0.0` in Docker. |
-| `frontend.port` | Frontend port | Must be an integer from `1` to `65535`. |
-| `frontend.backend_proxy_url` | Backend URL used by the frontend proxy | Use `http://backend:8000` in Docker and `http://localhost:8000` for local frontend development. |
 | `paths.strategies_dir` | Directory that stores strategy files | Must already exist on disk. |
 | `paths.data_dir` | Directory that stores local data files | Created automatically if it does not exist. |
 | `logging.level` | Minimum log level | One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
@@ -142,8 +139,8 @@ logging:
 - `paths.strategies_dir` must point to a real directory before startup succeeds.
 - `paths.data_dir` is created automatically if it does not exist.
 - Strategy files are discovered from `paths.strategies_dir` and shown to the web UI as a selectable list.
-- When using Docker, keep `backend.port` at `8000` and `frontend.port` at `3000`, or update the Compose port mappings at the same time.
 - `backend.allow_origins` should include every browser origin that needs to call the API.
+- The frontend uses `BACKEND_PROXY_URL`, `FRONTEND_HOST`, and `FRONTEND_PORT` at runtime instead of reading from `config.yaml`.
 
 ## Use From Python
 

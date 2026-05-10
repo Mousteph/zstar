@@ -53,26 +53,6 @@ class BackendConfig(BaseModel):
         return value
 
 
-class FrontendConfig(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    host: str = Field(..., min_length=1)
-    port: StrictInt = Field(..., ge=1, le=65535)
-    backend_proxy_url: str = Field(..., min_length=1)
-
-    @field_validator("host")
-    @classmethod
-    def validate_host(cls, value: str) -> str:
-        if value.strip() != value or not value.strip():
-            raise ValueError("host must be a non-empty hostname or IP address. Example: 0.0.0.0")
-        return value
-
-    @field_validator("backend_proxy_url")
-    @classmethod
-    def validate_backend_proxy_url(cls, value: str) -> str:
-        return _validate_http_url(value, "frontend.backend_proxy_url")
-
-
 class PathsConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -157,7 +137,6 @@ class AppConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     backend: BackendConfig
-    frontend: FrontendConfig
     paths: PathsConfig
     logging: LoggingConfig
 
@@ -167,10 +146,6 @@ FIELD_HINTS = {
     "backend.host": "Expected non-empty hostname or IP address. Example: 0.0.0.0",
     "backend.port": "Expected integer from 1 to 65535. Example: 8000",
     "backend.allow_origins": "Expected non-empty list of HTTP(S) origins. Example: ['http://localhost:3000']",
-    "frontend": "Expected object with host, port, and backend_proxy_url. Example: frontend: {host: '0.0.0.0', port: 3000, backend_proxy_url: 'http://backend:8000'}",
-    "frontend.host": "Expected non-empty hostname or IP address. Example: 0.0.0.0",
-    "frontend.port": "Expected integer from 1 to 65535. Example: 3000",
-    "frontend.backend_proxy_url": "Expected HTTP(S) URL. Example: http://backend:8000",
     "paths": "Expected object with strategies_dir and data_dir. Example: paths: {strategies_dir: 'strategies', data_dir: 'data'}",
     "paths.strategies_dir": "Expected existing directory path. Example: strategies",
     "paths.data_dir": "Expected existing directory path. Example: data",
@@ -221,12 +196,12 @@ def _read_config_file(path: Path) -> dict[str, Any]:
     if data is None:
         raise ConfigError(
             f"Configuration file '{path}' is empty. "
-            "Expected backend, frontend, paths, and optional logging sections. Example: config.yaml"
+            "Expected backend, paths, and optional logging sections. Example: config.yaml"
         )
     if not isinstance(data, dict):
         raise ConfigError(
             f"Configuration file '{path}' must contain a YAML object. "
-            "Expected top-level fields: backend, frontend, paths, and optional logging."
+            "Expected top-level fields: backend, paths, and optional logging."
         )
 
     return data

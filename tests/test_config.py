@@ -11,7 +11,6 @@ from zstar.config import ConfigError, clear_config_cache, load_config
 def _write_config(path: Path, strategies_dir: Path, data_dir: Path, **overrides: str) -> Path:
     backend_port = overrides.get("backend_port", "8000")
     backend_origin = overrides.get("backend_origin", "http://localhost:3000")
-    frontend_proxy = overrides.get("frontend_proxy", "http://backend:8000")
     extra = overrides.get("extra", "")
 
     path.write_text(
@@ -22,10 +21,6 @@ def _write_config(path: Path, strategies_dir: Path, data_dir: Path, **overrides:
                 f"  port: {backend_port}",
                 "  allow_origins:",
                 f'    - "{backend_origin}"',
-                "frontend:",
-                '  host: "0.0.0.0"',
-                "  port: 3000",
-                f'  backend_proxy_url: "{frontend_proxy}"',
                 "paths:",
                 f'  strategies_dir: "{strategies_dir}"',
                 f'  data_dir: "{data_dir}"',
@@ -50,7 +45,6 @@ def test_load_config_reads_valid_yaml(tmp_path):
     assert config.backend.host == "0.0.0.0"
     assert config.backend.port == 8000
     assert config.backend.allow_origins == ("http://localhost:3000",)
-    assert config.frontend.backend_proxy_url == "http://backend:8000"
     assert config.paths.strategies_dir == strategies_dir.resolve()
     assert config.paths.data_dir == data_dir.resolve()
     assert config.logging.level == "DEBUG"
@@ -88,10 +82,6 @@ def test_load_config_raises_clear_error_for_missing_required_field(tmp_path):
                 '  host: "0.0.0.0"',
                 "  allow_origins:",
                 '    - "http://localhost:3000"',
-                "frontend:",
-                '  host: "0.0.0.0"',
-                "  port: 3000",
-                '  backend_proxy_url: "http://backend:8000"',
                 "paths:",
                 f'  strategies_dir: "{strategies_dir}"',
                 f'  data_dir: "{data_dir}"',
@@ -121,7 +111,6 @@ def test_load_config_rejects_invalid_url_port_and_unknown_fields(tmp_path):
         data_dir,
         backend_port="70000",
         backend_origin="localhost:3000",
-        frontend_proxy="backend:8000",
         extra="unknown: true",
     )
 
@@ -131,7 +120,6 @@ def test_load_config_rejects_invalid_url_port_and_unknown_fields(tmp_path):
     message = str(exc_info.value)
     assert "backend.port" in message
     assert "backend.allow_origins" in message
-    assert "frontend.backend_proxy_url" in message
     assert "unknown" in message
 
 
@@ -235,10 +223,6 @@ def test_load_config_uses_explicit_logging_level(tmp_path):
                 "  port: 8000",
                 "  allow_origins:",
                 '    - "http://localhost:3000"',
-                "frontend:",
-                '  host: "0.0.0.0"',
-                "  port: 3000",
-                '  backend_proxy_url: "http://backend:8000"',
                 "paths:",
                 f'  strategies_dir: "{strategies_dir}"',
                 f'  data_dir: "{data_dir}"',
