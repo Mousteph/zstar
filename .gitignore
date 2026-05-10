@@ -1,11 +1,12 @@
 # Others
+AGENTS.md
+graphify-out/
 Ideas.md
 .DS_Store
 todo.txt
 *_dev.ipynb
 .codex/
 .env.prd
-config.yaml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

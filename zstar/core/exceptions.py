@@ -54,6 +54,11 @@ class MarketDataDownloadError(BacktestServiceError):
     status_code = 400
 
 
+class CsvDataError(BacktestServiceError):
+    error_code = "CSV_DATA_ERROR"
+    status_code = 400
+
+
 class BacktestExecutionError(BacktestServiceError):
     error_code = "BACKTEST_EXECUTION_ERROR"
     status_code = 400

@@ -11,17 +11,17 @@ const TONE_STYLES: Record<KpiMetricTone, ToneStyles> = {
   positive: {
     iconClassName: "text-emerald-500",
     valueClassName: "text-emerald-500",
-    strokeColor: "#10b981",
+    strokeColor: "rgb(16 185 129)",
   },
   neutral: {
     iconClassName: "text-blue-500",
     valueClassName: "",
-    strokeColor: "#3b82f6",
+    strokeColor: "rgb(59 130 246)",
   },
   negative: {
     iconClassName: "text-rose-500",
     valueClassName: "text-rose-500",
-    strokeColor: "#f43f5e",
+    strokeColor: "rgb(244 63 94)",
   },
 };
 
@@ -29,6 +29,51 @@ const TRADE_SIDE_BADGE_STYLES: Record<TradeSide, string> = {
   LONG: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]",
   SHORT: "bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.2)]",
 };
+
+const SOURCE_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/;
+
+interface SourceTimestampParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  hasTime: boolean;
+}
+
+function parseSourceTimestamp(value: string): SourceTimestampParts | null {
+  const match = SOURCE_TIMESTAMP_PATTERN.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day, hour, minute, second] = match;
+  const parts = {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: hour === undefined ? 0 : Number(hour),
+    minute: minute === undefined ? 0 : Number(minute),
+    second: second === undefined ? 0 : Number(second),
+    hasTime: hour !== undefined,
+  };
+
+  return Object.values(parts).every((part) => typeof part === "boolean" || Number.isFinite(part))
+    ? parts
+    : null;
+}
+
+export function sourceTimestampToUtcMilliseconds(value: string): number | null {
+  const parts = parseSourceTimestamp(value);
+  if (!parts) {
+    const fallback = new Date(value).getTime();
+    return Number.isFinite(fallback) ? fallback : null;
+  }
+
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
 
 export function formatCurrency(value: number): string {
   return value.toLocaleString("en-US", {
@@ -49,11 +94,24 @@ export function formatPercent(value: number): string {
 }
 
 export function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const milliseconds = sourceTimestampToUtcMilliseconds(value);
+  if (milliseconds === null) {
     return value;
   }
-  return date.toLocaleString();
+
+  const parts = parseSourceTimestamp(value);
+  const options: Intl.DateTimeFormatOptions = parts?.hasTime
+    ? {
+        dateStyle: "short",
+        timeStyle: "medium",
+        timeZone: "UTC",
+      }
+    : {
+        dateStyle: "short",
+        timeZone: "UTC",
+      };
+
+  return new Intl.DateTimeFormat(undefined, options).format(new Date(milliseconds));
 }
 
 export function getKpiToneStyles(tone: KpiMetricTone): ToneStyles {
@@ -69,10 +127,15 @@ export function getTradeSideBadgeClassName(side: TradeSide): string {
 }
 
 export function getTradePnlClassName(pnl: number): string {
-  return cn(
-    "text-right font-medium",
-    pnl > 0 ? "text-emerald-500" : pnl < 0 ? "text-rose-500" : "text-muted-foreground",
-  );
+  let pnlClassName = "text-muted-foreground";
+
+  if (pnl > 0) {
+    pnlClassName = "text-emerald-500";
+  } else if (pnl < 0) {
+    pnlClassName = "text-rose-500";
+  }
+
+  return cn("text-right font-medium", pnlClassName);
 }
 
 export function formatKpiLabel(key: string): string {
@@ -105,7 +168,6 @@ export function formatKpiValue(key: string, value: number | string | null): stri
     key.includes("fees") ||
     key.includes("profit") ||
     key.includes("loss") ||
-    key === "expectancy" ||
     key === "avg_win" ||
     key === "avg_loss" ||
     key === "best_trade" ||

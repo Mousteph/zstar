@@ -4,34 +4,37 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "clean": "rm -rf .next dist out",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-slot": "^1.2.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lightweight-charts": "^4.2.2",
     "lucide-react": "^0.546.0",
-    "monaco-editor": "^0.53.0",
+    "next": "^15.3.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-resizable-panels": "^4.7.6",
     "recharts": "^3.8.1",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "yaml": "^2.8.3",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.14",
+    "@tailwindcss/postcss": "^4.1.14",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.0.4",
+    "postcss": "^8.5.10",
     "tailwindcss": "^4.1.14",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "typescript": "~5.8.2"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }

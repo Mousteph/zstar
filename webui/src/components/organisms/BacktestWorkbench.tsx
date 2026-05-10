@@ -1,0 +1,206 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { AppHeader } from "@/components/organisms/backtest/AppHeader";
+import { BacktestSettingsPanel } from "@/components/organisms/backtest/BacktestSettingsPanel";
+import { DashboardPanel } from "@/components/organisms/backtest/DashboardPanel";
+import { fetchStrategies } from "@/features/backtest/api";
+import { useThemeModeSync } from "@/hooks/useThemeModeSync";
+import { mapKpiRows, mapSummaryKpis } from "@/lib/backtest/dashboardMappers";
+import { useBacktestStore } from "@/stores/useBacktestStore";
+import { useUIStore } from "@/stores/useUIStore";
+import type { EquityPoint, KpiMetric, KpiRow, MarketOhlcvPoint, Trade } from "@/types/backtest";
+
+const EMPTY_EQUITY_DATA: EquityPoint[] = [];
+const EMPTY_MARKET_OHLCV_DATA: MarketOhlcvPoint[] = [];
+const EMPTY_TRADES: Trade[] = [];
+const EMPTY_KPI_METRICS: KpiMetric[] = [];
+const EMPTY_KPI_ROWS: KpiRow[] = [];
+
+export function BacktestWorkbench() {
+  const [selectedStrategy, setSelectedStrategy] = useState("");
+  const [strategyOptions, setStrategyOptions] = useState<string[]>([]);
+  const [isStrategyMenuOpen, setIsStrategyMenuOpen] = useState(false);
+  const [isStrategiesLoading, setIsStrategiesLoading] = useState(false);
+  const [strategiesError, setStrategiesError] = useState<string | null>(null);
+  const strategyRequestIdRef = useRef(0);
+
+  const {
+    isSettingsOpen,
+    themeMode,
+    openSettings,
+    closeSettings,
+    toggleThemeMode,
+  } = useUIStore();
+
+  const {
+    isRunning,
+    isValidating,
+    csvFiles,
+    csvFilesError,
+    isCsvFilesLoading,
+    isCsvUploading,
+    settings,
+    backtestResult,
+    runStatus,
+    validationResult,
+    setSettings,
+    loadCsvFiles,
+    uploadCsv,
+    runValidation,
+    runCurrentBacktest,
+  } = useBacktestStore();
+
+  useThemeModeSync(themeMode);
+
+  const kpiMetrics = useMemo(() => (backtestResult ? mapSummaryKpis(backtestResult) : EMPTY_KPI_METRICS), [backtestResult]);
+  const kpiRows = useMemo(() => (backtestResult ? mapKpiRows(backtestResult) : EMPTY_KPI_ROWS), [backtestResult]);
+  const equityData = backtestResult?.equity_curve ?? EMPTY_EQUITY_DATA;
+  const marketOhlcvData = backtestResult?.market_ohlcv ?? EMPTY_MARKET_OHLCV_DATA;
+  const recentTrades = backtestResult?.trades ?? EMPTY_TRADES;
+
+  const closeStrategyMenu = useCallback(() => {
+    setIsStrategyMenuOpen(false);
+  }, []);
+
+  const loadStrategies = useCallback(() => {
+    const requestId = strategyRequestIdRef.current + 1;
+    strategyRequestIdRef.current = requestId;
+    setIsStrategiesLoading(true);
+    setStrategiesError(null);
+
+    void fetchStrategies()
+      .then((strategies) => {
+        if (requestId !== strategyRequestIdRef.current) {
+          return;
+        }
+
+        setStrategyOptions(strategies);
+        setSelectedStrategy((currentStrategy) => {
+          if (currentStrategy && strategies.includes(currentStrategy)) {
+            return currentStrategy;
+          }
+
+          return "";
+        });
+      })
+      .catch((error: unknown) => {
+        if (requestId !== strategyRequestIdRef.current) {
+          return;
+        }
+
+        setStrategiesError(error instanceof Error ? error.message : "Unable to fetch strategies.");
+      })
+      .finally(() => {
+        if (requestId !== strategyRequestIdRef.current) {
+          return;
+        }
+
+        setIsStrategiesLoading(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    loadStrategies();
+  }, [loadStrategies]);
+
+  const toggleStrategyMenu = useCallback(() => {
+    if (isStrategyMenuOpen) {
+      setIsStrategyMenuOpen(false);
+      return;
+    }
+
+    setIsStrategyMenuOpen(true);
+    loadStrategies();
+  }, [isStrategyMenuOpen, loadStrategies]);
+
+  const selectedStrategyPayload = selectedStrategy.trim();
+
+  const canRunBacktest =
+    !isRunning &&
+    !isValidating &&
+    Boolean(selectedStrategyPayload) &&
+    (settings.dataSource !== "csv" || settings.csvFilename.trim().length > 0);
+
+  const canCheckCode = !isRunning && !isValidating && Boolean(selectedStrategyPayload);
+
+  const runDisabledReason = !selectedStrategyPayload
+    ? "Select a strategy before running."
+    : settings.dataSource === "csv" && !settings.csvFilename.trim()
+      ? "Select or upload a CSV file before running."
+      : undefined;
+
+  const dashboardPanel = (
+    <DashboardPanel
+      equityData={equityData}
+      marketOhlcvData={marketOhlcvData}
+      kpiMetrics={kpiMetrics}
+      kpiRows={kpiRows}
+      recentTrades={recentTrades}
+      runStatus={runStatus}
+      validationResult={validationResult}
+      isValidating={isValidating}
+      backtestResult={backtestResult}
+      selectedStrategy={selectedStrategy}
+      settings={settings}
+      themeMode={themeMode}
+    />
+  );
+
+  return (
+    <div className="h-screen w-full bg-background text-foreground flex flex-col overflow-hidden">
+      {isStrategyMenuOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-[12000] bg-black/50 backdrop-blur-[2px]"
+          onClick={closeStrategyMenu}
+          aria-label="Close strategy selector"
+        />
+      ) : null}
+
+      <AppHeader
+        isRunning={isRunning}
+        isValidating={isValidating}
+        selectedStrategy={selectedStrategy}
+        strategyOptions={strategyOptions}
+        isStrategyMenuOpen={isStrategyMenuOpen}
+        isStrategiesLoading={isStrategiesLoading}
+        strategiesError={strategiesError}
+        themeMode={themeMode}
+        onRunBacktest={() => {
+          void runCurrentBacktest(selectedStrategyPayload);
+        }}
+        onCheckCode={() => {
+          void runValidation(selectedStrategyPayload);
+        }}
+        canRunBacktest={canRunBacktest}
+        canCheckCode={canCheckCode}
+        runDisabledReason={runDisabledReason}
+        onOpenSettings={openSettings}
+        onToggleTheme={toggleThemeMode}
+        onToggleStrategyMenu={toggleStrategyMenu}
+        onSelectStrategy={(strategy) => {
+          setSelectedStrategy(strategy);
+          setIsStrategyMenuOpen(false);
+        }}
+        onCloseStrategyMenu={closeStrategyMenu}
+      />
+
+      <main className="flex-1 overflow-hidden">{dashboardPanel}</main>
+
+      <BacktestSettingsPanel
+        isOpen={isSettingsOpen}
+        settings={settings}
+        csvFiles={csvFiles}
+        csvFilesError={csvFilesError}
+        isCsvFilesLoading={isCsvFilesLoading}
+        isCsvUploading={isCsvUploading}
+        onSettingsChange={setSettings}
+        onLoadCsvFiles={loadCsvFiles}
+        onUploadCsv={uploadCsv}
+        onClose={closeSettings}
+      />
+    </div>
+  );
+}

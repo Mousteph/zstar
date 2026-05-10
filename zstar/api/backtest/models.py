@@ -1,15 +1,56 @@
-from typing import Dict, List, Optional
+from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from datetime import date
+from typing import Dict, List, Optional, Literal, Union
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from zstar.core.backtest import BacktestConfigModel
-from zstar.core.data_loader import DataLoaderConfigModel
+
+
+class BaseDataLoaderConfigModel(BaseModel):
+    source: Literal["yahoo", "csv"]
+
+
+class CsvDataLoaderConfigModel(BaseDataLoaderConfigModel):
+    source: Literal["csv"]
+    filename: str = Field(min_length=1)
+
+
+class YahooDataLoaderConfigModel(BaseDataLoaderConfigModel):
+    source: Literal["yahoo"] = "yahoo"
+    symbol: str = Field(min_length=1, max_length=20)
+    start_date: date | None = Field(default=None)
+    end_date: date | None = Field(default=None)
+    interval: str = Field(default="1d")
+
+    @field_validator("symbol")
+    @classmethod
+    def validate_symbol(cls, symbol: str) -> str:
+        normalized = symbol.strip().upper()
+        if not normalized:
+            raise ValueError("symbol cannot be empty")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_dates(self) -> "YahooDataLoaderConfigModel":
+        if self.end_date is not None and self.start_date is not None and self.end_date < self.start_date:
+            raise ValueError("end_date must be greater than or equal to start_date")
+        return self
 
 
 class BacktestRunRequest(BaseModel):
-    strategy_code: str = Field(min_length=1, description="Python strategy source code")
-    data: DataLoaderConfigModel
+    data: Union[YahooDataLoaderConfigModel, CsvDataLoaderConfigModel]
     backtest_config: BacktestConfigModel
+    strategy_filename: Optional[str] = None
+
+
+class CsvFilesListResponse(BaseModel):
+    files: list[str]
+
+
+class CsvFileUploadResponse(BaseModel):
+    filename: str
+    files: list[str]
 
 
 class EquityPointResponse(BaseModel): 
@@ -25,6 +66,9 @@ class TradeResponse(BaseModel):
     size: float
     entry_price: float
     exit_price: float
+    take_profit_price: Optional[float] = None
+    stop_loss_price: Optional[float] = None
+    exit_reason: str = "signal"
     entry_datetime: str
     exit_datetime: str
     raw_pnl: float
@@ -57,3 +101,31 @@ class BacktestRunResponse(BaseModel):
     trades: List[TradeResponse]
     kpis: Dict[str, Optional[float | str]]
     meta: BacktestMetaResponse
+
+
+class BacktestRunEnvelopeResponse(BaseModel):
+    strategy_validation: Optional[ValidateStrategiesResponse] = None
+    backtest_result: Optional[BacktestRunResponse] = None
+
+
+class StrategiesListResponse(BaseModel):
+    strategies: list[str]
+
+
+class ValidateStrategiesRequest(BaseModel):
+    strategy_filename: Optional[str] = None
+
+
+class ValidationIssueResponse(BaseModel):
+    category: Literal["syntax", "template", "type", "logic"]
+    file: str
+    line: Optional[int] = None
+    message: str
+
+
+class ValidateStrategiesResponse(BaseModel):
+    strategy_filename: str
+    ready_to_backtest: bool
+    total_errors: int
+    issues: list[ValidationIssueResponse]
+    summary_text: str

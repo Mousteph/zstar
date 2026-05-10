@@ -1,26 +1,32 @@
-https://github.com/user-attachments/assets/91c7c6b0-fa99-4624-80f1-5554134992d2
+https://github.com/user-attachments/assets/f0abc3fd-ea67-41d4-819d-9f0c41e9361a
 
 # Z* (ZStar)
 
-Lightweight backtesting framework for running Python trading strategies from a CLI, a FastAPI backend, or a React web UI.
+Lightweight backtesting framework for running Python trading strategies from a FastAPI backend, a Next.js web UI, or direct Python imports.
+
+## Documentation
+
+- [Core strategy contract](docs/core-strategy.md)
+- [Backtest engine flow](docs/engine.md)
+- [Backtesting metrics reference](docs/metrics.md)
 
 ## What It Solves
 
-ZStar gives you a small local workflow for testing a strategy against historical market data without building your own engine, API, and dashboard first.
+ZStar gives you a local workflow for testing a trading strategy against historical market data without having to build the engine, API, and dashboard yourself.
 
 ## How It Works
 
-1. You define a Python `strategy` object that inherits from `CoreStrategy`.
-2. ZStar loads OHLCV data from Yahoo Finance.
-3. The backtest engine applies your signals, position sizing, fees, and slippage.
-4. Results are returned in the UI/API or written by the CLI as KPI JSON and an equity-curve HTML report.
+1. You define a Python strategy class that inherits from `CoreStrategy`.
+2. ZStar loads OHLCV data from Yahoo Finance or from a CSV file.
+3. The backtest engine applies your signals, position sizing, fees, and slippage bar by bar.
+4. Results are returned as KPIs, trades, market candles, and an equity curve.
 
 ## Main Capabilities
 
-- Run backtests from the web UI, CLI, or Python code
-- Load strategy code dynamically
-- Configure fees, slippage, seed, balance, symbol, and date range
-- Return KPIs, trades, market candles, and equity curve data
+- Run backtests from the web UI or Python code
+- Load strategy files dynamically and validate them before execution
+- Configure balance, fees, slippage, seed, symbol, and date range
+- Inspect KPIs, trades, market data, and equity curve output
 
 ## Prerequisites
 
@@ -37,59 +43,122 @@ cd zstar
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp config_example.yaml config.yaml
 ```
 
-`config.yaml` controls backend host, port, and allowed origins.
+The repository expects a `config.yaml` file in the project root by default.
+
+## Starter Strategies
+
+The project ships with two ready-to-run strategy files in [`strategies/`](strategies/), so you can open the app and test immediately on first launch:
+
+- [`sma_crossover_long_only.py`](strategies/sma_crossover_long_only.py): long-only SMA crossover with stop loss and balance-based sizing.
+- [`rsi_long_short.py`](strategies/rsi_long_short.py): RSI oversold/overbought strategy, stop loss, take profit, and 10% sizing.
+
+These files are automatically discovered by the backend and shown in the web UI as selectable strategies.
 
 ## Quick Start
 
-### Web UI with Docker (recommended)
+### Docker Compose
+
+The easiest way to run the full stack is:
 
 ```bash
-docker compose --profile dev up --build
+docker compose up --build
 ```
 
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:8000`
 
-### CLI backtest
+### Backend Only
+
+Run the FastAPI backend directly with the default config:
 
 ```bash
-python -m zstar.cli backtest \
-  --strategy-file examples/cli/strategy.py \
-  --config-file examples/cli/cli_config.yaml
+python -m zstar
 ```
 
-Default CLI outputs:
+You can also pass an explicit config path:
 
-- `outputs/kpis.json`
-- `outputs/equity_curve.html`
+```bash
+python -m zstar custom-config.yaml
+```
 
-## Local Development
-
-Backend:
+The equivalent API module entrypoint is also available:
 
 ```bash
 python -m zstar.api
+python -m zstar.api custom-config.yaml
 ```
 
-Frontend:
+### Frontend Only
 
 ```bash
 cd webui
 npm ci
-npm run dev
+node scripts/start-next.mjs dev
 ```
 
-The Vite dev server proxies `/api` requests to `http://localhost:8000` by default.
+When the frontend runs outside Docker, set these environment variables before starting Next.js:
+
+- `BACKEND_PROXY_URL=http://localhost:8000`
+- `FRONTEND_HOST=0.0.0.0`
+- `FRONTEND_PORT=3000`
+
+## Configuration
+
+ZStar loads `config.yaml` on startup for backend settings only. Docker mounts the repository config into the backend container, and the frontend reads its runtime settings from environment variables.
+
+```yaml
+backend:
+  host: "0.0.0.0"
+  port: 8000
+  allow_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+paths:
+  strategies_dir: "strategies"
+  data_dir: "data"
+logging:
+  level: "DEBUG"
+  directory: "logs"
+  filename: "app.log"
+  max_bytes: 10485760
+  backup_count: 5
+  stdout: true
+```
+
+### Config Fields
+
+| Field | Purpose | Notes |
+| --- | --- | --- |
+| `backend.host` | Bind address for the FastAPI server | Use `0.0.0.0` in Docker or local network access. |
+| `backend.port` | Backend port | Must be an integer from `1` to `65535`. |
+| `backend.allow_origins` | CORS allow-list | Use full `http://` or `https://` origins. |
+| `paths.strategies_dir` | Directory that stores strategy files | Must already exist on disk. |
+| `paths.data_dir` | Directory that stores local data files | Created automatically if it does not exist. |
+| `logging.level` | Minimum log level | One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
+| `logging.directory` | Directory for log files | Relative paths are resolved from the config file location. |
+| `logging.filename` | Log filename | Must be a base filename, not a path. |
+| `logging.max_bytes` | Rotation threshold | Default is `10 MB`. |
+| `logging.backup_count` | Number of rotated log files to keep | Default is `5`. |
+| `logging.stdout` | Mirror logs to stdout | Useful in Docker and during development. |
+
+### Configuration Notes
+
+- `paths.strategies_dir` must point to a real directory before startup succeeds.
+- `paths.data_dir` is created automatically if it does not exist.
+- Strategy files are discovered from `paths.strategies_dir` and shown to the web UI as a selectable list.
+- `backend.allow_origins` should include every browser origin that needs to call the API.
+- The frontend uses `BACKEND_PROXY_URL`, `FRONTEND_HOST`, and `FRONTEND_PORT` at runtime instead of reading from `config.yaml`.
 
 ## Use From Python
 
+You can run the backtester directly from code without the web UI.
+
 ```python
-from zstar.core.backtest import BacktesterEngine, BacktestConfigModel
-from zstar.core.data_loader import DataLoaderConfigModel, YahooData
-from zstar.core.core_strategy import CoreStrategy
+from zstar import CoreStrategy, BacktesterEngine
+from zstar.core.backtest import BacktestConfigModel
+from zstar.core.data_loader import YahooData
 
 
 class BuyAndHoldStrategy(CoreStrategy):
@@ -107,9 +176,7 @@ class BuyAndHoldStrategy(CoreStrategy):
         return round(balance / entry_price, 4)
 
 
-strategy = BuyAndHoldStrategy()
-
-data_config = DataLoaderConfigModel(
+data_handler = YahooData(
     symbol="AAPL",
     start_date="2024-01-01",
     end_date="2025-01-01",
@@ -124,14 +191,14 @@ backtest_config = BacktestConfigModel(
     slippage_seed=42,
 )
 
-engine = BacktesterEngine(strategy, YahooData(data_config), backtest_config)
+engine = BacktesterEngine(BuyAndHoldStrategy(), data_handler, backtest_config)
 report = engine.run_backtest()
 
 print(report.kpis())
 print(report.equity_curve().tail())
 ```
 
-Your strategy must inherit from `CoreStrategy` and expose the entry, exit, and sizing logic you want to test.
+If you want to load strategy code dynamically, import `load_strategy_from_code` from `zstar.core.strategy` and make sure the code defines exactly one `CoreStrategy` subclass.
 
 ## Validation
 
@@ -139,11 +206,10 @@ Your strategy must inherit from `CoreStrategy` and expose the entry, exit, and s
 python -m pytest -q
 ```
 
-## Roadmap
+## Reference Docs
 
-Planned directions for ZStar:
+Use these pages when you want the implementation details instead of the quick start:
 
-- Support additional market data sources beyond Yahoo Finance
-- Add paper trading and live monitoring workflows
-- Add optimization tools such as parameter tuning and walk-forward testing
-- Add an AI assistant in the Web UI to help explain strategies and backtest results
+- [`docs/core-strategy.md`](docs/core-strategy.md)
+- [`docs/engine.md`](docs/engine.md)
+- [`docs/metrics.md`](docs/metrics.md)

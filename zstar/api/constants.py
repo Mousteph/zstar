@@ -1,0 +1,2 @@
+PYTHON_FILE_SUFFIX = ".py"
+CSV_FILE_SUFFIX = ".csv"

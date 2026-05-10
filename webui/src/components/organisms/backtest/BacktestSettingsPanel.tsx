@@ -1,0 +1,451 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Upload, X } from "lucide-react";
+
+import { Button } from "@/components/atoms/Button";
+import { TIMEFRAME_OPTIONS } from "@/features/backtest/constants";
+import { useScrollLock } from "@/hooks/useScrollLock";
+import type { BacktestSettings } from "@/types/backtest";
+
+interface BacktestSettingsPanelProps {
+  readonly isOpen: boolean;
+  readonly settings: BacktestSettings;
+  readonly csvFiles: string[];
+  readonly csvFilesError: string | null;
+  readonly isCsvFilesLoading: boolean;
+  readonly isCsvUploading: boolean;
+  readonly onClose: () => void;
+  readonly onSettingsChange: (settings: BacktestSettings) => void;
+  readonly onLoadCsvFiles: () => Promise<void>;
+  readonly onUploadCsv: (file: File) => Promise<void>;
+}
+
+type NumericFieldName = "initialBalance" | "entryFeePct" | "exitFeePct" | "slippagePct";
+
+interface NumericFieldConfig {
+  label: string;
+  min: number;
+  max?: number;
+}
+
+const NUMERIC_FIELD_CONFIG: Record<NumericFieldName, NumericFieldConfig> = {
+  initialBalance: { label: "Initial balance", min: 0 },
+  entryFeePct: { label: "Entry fee %", min: 0, max: 100 },
+  exitFeePct: { label: "Exit fee %", min: 0, max: 100 },
+  slippagePct: { label: "Slippage %", min: 0, max: 100 },
+};
+
+const SETTINGS_FIELD_CLASS_NAME =
+  "w-full rounded-lg border border-border/80 bg-background/80 px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-ring";
+
+function normalizeNumberInput(value: string): string {
+  return value.trim().replaceAll(",", ".");
+}
+
+function parseEditableNumber(value: string): number | null {
+  const normalized = normalizeNumberInput(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function validateNumericDraft(field: NumericFieldName, value: string): string | null {
+  const parsed = parseEditableNumber(value);
+  const config = NUMERIC_FIELD_CONFIG[field];
+
+  if (parsed === null) {
+    return `${config.label} must be a numeric value.`;
+  }
+  if (parsed < config.min) {
+    return `${config.label} must be greater than or equal to ${config.min}.`;
+  }
+  if (config.max !== undefined && parsed > config.max) {
+    return `${config.label} must be less than or equal to ${config.max}.`;
+  }
+
+  return null;
+}
+
+export function BacktestSettingsPanel({
+  isOpen,
+  settings,
+  csvFiles,
+  csvFilesError,
+  isCsvFilesLoading,
+  isCsvUploading,
+  onClose,
+  onSettingsChange,
+  onLoadCsvFiles,
+  onUploadCsv,
+}: Readonly<BacktestSettingsPanelProps>) {
+  useScrollLock(isOpen);
+  const [numericDrafts, setNumericDrafts] = useState<Record<NumericFieldName, string>>({
+    initialBalance: String(settings.initialBalance),
+    entryFeePct: String(settings.entryFeePct),
+    exitFeePct: String(settings.exitFeePct),
+    slippagePct: String(settings.slippagePct),
+  });
+  const [slippageSeedDraft, setSlippageSeedDraft] = useState(settings.slippageSeed);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<NumericFieldName | "slippageSeed", string>>>({});
+
+  const hasFieldErrors = useMemo(() => Object.values(fieldErrors).some(Boolean), [fieldErrors]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    globalThis.window.addEventListener("keydown", handleEscape);
+    return () => {
+      globalThis.window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    void onLoadCsvFiles();
+  }, [isOpen, onLoadCsvFiles]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setNumericDrafts({
+      initialBalance: String(settings.initialBalance),
+      entryFeePct: String(settings.entryFeePct),
+      exitFeePct: String(settings.exitFeePct),
+      slippagePct: String(settings.slippagePct),
+    });
+    setSlippageSeedDraft(settings.slippageSeed);
+    setFieldErrors({});
+  }, [isOpen, settings]);
+
+  const updateNumericDraft = (field: NumericFieldName, value: string) => {
+    setNumericDrafts((currentDrafts) => ({ ...currentDrafts, [field]: value }));
+  };
+
+  const applyNumericDraft = (field: NumericFieldName) => {
+    const error = validateNumericDraft(field, numericDrafts[field]);
+    if (error) {
+      setFieldErrors((currentErrors) => ({ ...currentErrors, [field]: error }));
+      return;
+    }
+
+    const parsed = parseEditableNumber(numericDrafts[field]);
+    if (parsed === null) {
+      return;
+    }
+
+    setFieldErrors((currentErrors) => ({ ...currentErrors, [field]: undefined }));
+    onSettingsChange({
+      ...settings,
+      [field]: parsed,
+    });
+    setNumericDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [field]: String(parsed),
+    }));
+  };
+
+  const applySlippageSeedDraft = () => {
+    const trimmedValue = slippageSeedDraft.trim();
+    const isValidSeed = !trimmedValue || Number.isInteger(Number(trimmedValue));
+    if (!isValidSeed) {
+      setFieldErrors((currentErrors) => ({
+        ...currentErrors,
+        slippageSeed: "Slippage seed must be an integer.",
+      }));
+      return;
+    }
+
+    setFieldErrors((currentErrors) => ({ ...currentErrors, slippageSeed: undefined }));
+    onSettingsChange({
+      ...settings,
+      slippageSeed: trimmedValue,
+    });
+    setSlippageSeedDraft(trimmedValue);
+  };
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[13000]">
+      <button
+        type="button"
+        aria-label="Close backtest settings dialog"
+        className="absolute inset-0 bg-black/45 backdrop-blur-[2px]"
+        onClick={onClose}
+      />
+      <div className="relative z-10 flex h-full items-center justify-center p-4">
+        <div className="settings-panel-surface relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border/80 p-5 shadow-2xl sm:p-6">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-[1.65rem] font-semibold tracking-tight text-foreground">Backtest Settings</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg border border-border/80 bg-muted/60 text-foreground hover:bg-muted"
+              onClick={onClose}
+              aria-label="Close settings"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <span className="mb-1.5 block text-sm text-muted-foreground">Source</span>
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/80 bg-background/80 p-1">
+                {(["yahoo", "csv"] as const).map((source) => (
+                  <button
+                    key={source}
+                    type="button"
+                    className={`h-9 rounded-md text-sm font-medium transition-colors ${
+                      settings.dataSource === source
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                    onClick={() =>
+                      onSettingsChange({
+                        ...settings,
+                        dataSource: source,
+                        csvFilename: source === "csv" && !settings.csvFilename && csvFiles.length > 0 ? csvFiles[0] : settings.csvFilename,
+                      })
+                    }
+                  >
+                    {source === "yahoo" ? "Yahoo" : "CSV"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {settings.dataSource === "yahoo" ? (
+              <>
+                <label className="block">
+                  <span className="mb-1.5 block text-sm text-muted-foreground">Symbol</span>
+                  <input
+                    value={settings.symbol}
+                    onChange={(event) =>
+                      onSettingsChange({
+                        ...settings,
+                        symbol: event.target.value.toUpperCase(),
+                      })
+                    }
+                    className={SETTINGS_FIELD_CLASS_NAME}
+                    placeholder="AAPL"
+                  />
+                </label>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm text-muted-foreground">Start Date</span>
+                    <input
+                      type="date"
+                      value={settings.startDate}
+                      onChange={(event) =>
+                        onSettingsChange({
+                          ...settings,
+                          startDate: event.target.value,
+                        })
+                      }
+                      className={SETTINGS_FIELD_CLASS_NAME}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm text-muted-foreground">End Date</span>
+                    <input
+                      type="date"
+                      value={settings.endDate}
+                      onChange={(event) =>
+                        onSettingsChange({
+                          ...settings,
+                          endDate: event.target.value,
+                        })
+                      }
+                      className={SETTINGS_FIELD_CLASS_NAME}
+                    />
+                  </label>
+                </div>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-sm text-muted-foreground">Timeframe</span>
+                  <select
+                    value={settings.interval}
+                    onChange={(event) =>
+                      onSettingsChange({
+                        ...settings,
+                        interval: event.target.value,
+                      })
+                    }
+                    className={SETTINGS_FIELD_CLASS_NAME}
+                  >
+                    {TIMEFRAME_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm text-muted-foreground">CSV File</span>
+                  <select
+                    value={settings.csvFilename}
+                    onChange={(event) =>
+                      onSettingsChange({
+                        ...settings,
+                        csvFilename: event.target.value,
+                      })
+                    }
+                    className={SETTINGS_FIELD_CLASS_NAME}
+                    disabled={isCsvFilesLoading || csvFiles.length === 0}
+                  >
+                    <option value="">{isCsvFilesLoading ? "Loading CSV files..." : "Select a CSV file"}</option>
+                    {csvFiles.map((filename) => (
+                      <option key={filename} value={filename}>
+                        {filename}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border/90 bg-background/70 px-3 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/70">
+                  <Upload className="h-4 w-4" />
+                  <span>{isCsvUploading ? "Uploading..." : "Upload CSV"}</span>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="sr-only"
+                    disabled={isCsvUploading}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file) {
+                        void onUploadCsv(file);
+                      }
+                    }}
+                  />
+                </label>
+
+                {csvFilesError ? <p className="text-sm text-destructive">{csvFilesError}</p> : null}
+              </div>
+            )}
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm text-muted-foreground">Initial Balance</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={numericDrafts.initialBalance}
+                onChange={(event) => updateNumericDraft("initialBalance", event.target.value)}
+                onBlur={() => applyNumericDraft("initialBalance")}
+                className={SETTINGS_FIELD_CLASS_NAME}
+              />
+              {fieldErrors.initialBalance ? (
+                <p className="mt-1 text-xs text-destructive">{fieldErrors.initialBalance}</p>
+              ) : null}
+            </label>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-sm text-muted-foreground">Entry Fee %</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={numericDrafts.entryFeePct}
+                  onChange={(event) => updateNumericDraft("entryFeePct", event.target.value)}
+                  onBlur={() => applyNumericDraft("entryFeePct")}
+                  className={SETTINGS_FIELD_CLASS_NAME}
+                />
+                {fieldErrors.entryFeePct ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.entryFeePct}</p>
+                ) : null}
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-sm text-muted-foreground">Exit Fee %</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={numericDrafts.exitFeePct}
+                  onChange={(event) => updateNumericDraft("exitFeePct", event.target.value)}
+                  onBlur={() => applyNumericDraft("exitFeePct")}
+                  className={SETTINGS_FIELD_CLASS_NAME}
+                />
+                {fieldErrors.exitFeePct ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.exitFeePct}</p>
+                ) : null}
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-sm text-muted-foreground">Slippage %</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={numericDrafts.slippagePct}
+                  onChange={(event) => updateNumericDraft("slippagePct", event.target.value)}
+                  onBlur={() => applyNumericDraft("slippagePct")}
+                  className={SETTINGS_FIELD_CLASS_NAME}
+                />
+                {fieldErrors.slippagePct ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.slippagePct}</p>
+                ) : null}
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-sm text-muted-foreground">Slippage Seed</span>
+                <input
+                  value={slippageSeedDraft}
+                  onChange={(event) => setSlippageSeedDraft(event.target.value)}
+                  onBlur={applySlippageSeedDraft}
+                  className={SETTINGS_FIELD_CLASS_NAME}
+                  placeholder="optional"
+                />
+                {fieldErrors.slippageSeed ? (
+                  <p className="mt-1 text-xs text-destructive">{fieldErrors.slippageSeed}</p>
+                ) : null}
+              </label>
+            </div>
+          </div>
+
+          {hasFieldErrors ? (
+            <p className="mt-4 text-sm text-destructive">
+              Some values are invalid. Fix the highlighted fields before running a backtest.
+            </p>
+          ) : null}
+
+          <div className="mt-7">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-10 w-full rounded-lg border border-border/80 bg-muted/60 text-foreground hover:bg-muted"
+              onClick={onClose}
+            >
+              Done
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
